@@ -8,17 +8,19 @@ import (
 )
 
 const (
-	workerStatusWait = iota
-	workerStatusBusy
+	WorkerStatusWait = int64(iota)
+	WorkerStatusBusy
 )
 
 type Worker struct {
-	id        string
-	status    int
-	created   time.Time
+	mutex     sync.RWMutex
 	waitGroup *sync.WaitGroup
-	newTask   chan *Task
-	quit      chan bool // канал для завершения исполнителя
+
+	id      string
+	status  int64
+	created time.Time
+	newTask chan *Task
+	quit    chan bool
 }
 
 func NewWorker() *Worker {
@@ -26,7 +28,7 @@ func NewWorker() *Worker {
 
 	return &Worker{
 		id:        id,
-		status:    workerStatusWait,
+		status:    WorkerStatusWait,
 		created:   time.Now(),
 		waitGroup: new(sync.WaitGroup),
 		newTask:   make(chan *Task, 1),
@@ -34,39 +36,39 @@ func NewWorker() *Worker {
 	}
 }
 
-// kill worker shutdown
-func (w *Worker) Kill() {
-	w.quit <- true
-}
-
-// work выполняет задачу
 func (w *Worker) process(done chan *Worker, repeatQueue chan *Task) {
 	for {
 		select {
-		// пришло новое задание на выполнение
 		case task := <-w.newTask:
 			w.waitGroup.Add(1)
+
+			w.setStatus(WorkerStatusBusy)
+
+			if task.GetStatus() != TaskStatusRepeatWait {
+				task.setAttempts(0)
+			}
 
 			func() {
 				defer func() {
 					task.setFinishedTime(time.Now())
 
 					if err := recover(); err != nil {
-						task.setStatus(taskStatusFail)
+						task.setStatus(TaskStatusFail)
 						task.setLastError(err)
 					}
 
 					repeats := task.GetRepeats()
 					if repeats == -1 || task.GetAttempts() < repeats {
-						task.setStatus(taskStatusRepeatWait)
+						task.setStatus(TaskStatusRepeatWait)
 						repeatQueue <- task
 					}
 
 					w.waitGroup.Done()
+					w.setStatus(WorkerStatusWait)
 					done <- w
 				}()
 
-				task.setStatus(taskStatusProcess)
+				task.setStatus(TaskStatusProcess)
 				task.setAttempts(task.GetAttempts() + 1)
 
 				newRepeats, newDuration := w.execute(task)
@@ -74,10 +76,9 @@ func (w *Worker) process(done chan *Worker, repeatQueue chan *Task) {
 				task.SetDuration(newDuration)
 			}()
 
-		// пришел сигнал на завершение исполнителя
 		case <-w.quit:
-			// ждем завершения текущего задания, если таковое есть и выходим
 			w.waitGroup.Wait()
+			w.setStatus(WorkerStatusWait)
 			return
 		}
 	}
@@ -109,12 +110,12 @@ func (w *Worker) execute(task *Task) (int64, time.Duration) {
 					panic(r[2])
 				}
 
-				task.setStatus(taskStatusSuccess)
+				task.setStatus(TaskStatusSuccess)
 				return r[0].(int64), r[1].(time.Duration)
 
 			case <-time.After(timeout):
 				quit <- true
-				task.setStatus(taskStatusFailByTimeout)
+				task.setStatus(TaskStatusFailByTimeout)
 				return task.GetRepeats(), task.GetDuration()
 			}
 		}
@@ -122,7 +123,22 @@ func (w *Worker) execute(task *Task) (int64, time.Duration) {
 
 	// execute without timeout
 	repeats, duration := task.GetFunction()(task.GetAttempts(), quit, task.GetArguments()...)
-	task.setStatus(taskStatusSuccess)
+	task.setStatus(TaskStatusSuccess)
 
 	return repeats, duration
+}
+
+func (w *Worker) Kill() {
+	w.quit <- true
+}
+
+func (w *Worker) sendTask(task *Task) {
+	w.newTask <- task
+}
+
+func (w *Worker) setStatus(status int64) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	w.status = status
 }

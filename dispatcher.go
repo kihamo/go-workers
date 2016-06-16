@@ -58,8 +58,7 @@ func (d *Dispatcher) Run() {
 		// пришел новый таск на выполнение от flow контроллера
 		case task := <-d.executeQueue:
 			worker := heap.Pop(d.team).(*Worker)
-			worker.newTask <- task
-			worker.status = workerStatusBusy
+			worker.sendTask(task)
 			heap.Push(d.team, worker)
 
 			// проверяем есть ли еще свободные исполнители для задач
@@ -70,7 +69,6 @@ func (d *Dispatcher) Run() {
 		// пришло уведомление, что рабочий закончил выполнение задачи
 		case worker := <-d.done:
 			heap.Remove(d.team, d.team.GetIndexById(worker.id))
-			worker.status = workerStatusWait
 			heap.Push(d.team, worker)
 
 			// проверяем не освободился ли какой-нибудь исполнитель

@@ -8,12 +8,12 @@ import (
 )
 
 const (
-	taskStatusWait = int64(iota)
-	taskStatusProcess
-	taskStatusSuccess
-	taskStatusFail
-	taskStatusFailByTimeout
-	taskStatusRepeatWait
+	TaskStatusWait = int64(iota)
+	TaskStatusProcess
+	TaskStatusSuccess
+	TaskStatusFail
+	TaskStatusFailByTimeout
+	TaskStatusRepeatWait
 )
 
 type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration)
@@ -46,7 +46,7 @@ func NewTask(name string, duration time.Duration, timeout time.Duration, repeats
 		args:     args,
 
 		id:        uuid.New(),
-		status:    taskStatusWait,
+		status:    TaskStatusWait,
 		attempts:  0,
 		createdAt: time.Now(),
 	}
