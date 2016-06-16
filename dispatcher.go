@@ -109,7 +109,7 @@ func (d *Dispatcher) AddTask(task *Task) {
 }
 
 func (d *Dispatcher) AddNamedTaskByFunc(name string, fn TaskFunction, args ...interface{}) *Task {
-	task := NewTask(name, time.Duration(0), 1, fn, args)
+	task := NewTask(name, time.Duration(0), time.Duration(0), 1, fn, args)
 	d.AddTask(task)
 
 	return task

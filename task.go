@@ -12,11 +12,11 @@ const (
 	taskStatusProcess
 	taskStatusSuccess
 	taskStatusFail
-	taskStatusFailByTimeOut
+	taskStatusFailByTimeout
 	taskStatusRepeatWait
 )
 
-type TaskFunction func(int64, ...interface{}) (int64, time.Duration)
+type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration)
 
 type Task struct {
 	mutex sync.RWMutex
@@ -36,10 +36,11 @@ type Task struct {
 	lastError  interface{}
 }
 
-func NewTask(name string, duration time.Duration, repeats int64, fn TaskFunction, args ...interface{}) *Task {
+func NewTask(name string, duration time.Duration, timeout time.Duration, repeats int64, fn TaskFunction, args ...interface{}) *Task {
 	return &Task{
 		name:     name,
 		duration: duration,
+		timeout:  timeout,
 		repeats:  repeats,
 		fn:       fn,
 		args:     args,
@@ -163,4 +164,11 @@ func (t *Task) setFinishedTime(time time.Time) {
 	defer t.mutex.Unlock()
 
 	t.finishedAt = &time
+}
+
+func (t *Task) GetTimeout() time.Duration {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.timeout
 }

@@ -54,8 +54,6 @@ func (w *Worker) process(done chan *Worker, repeatQueue chan *Task) {
 					if err := recover(); err != nil {
 						task.setStatus(taskStatusFail)
 						task.setLastError(err)
-					} else {
-						task.setStatus(taskStatusSuccess)
 					}
 
 					repeats := task.GetRepeats()
@@ -68,12 +66,10 @@ func (w *Worker) process(done chan *Worker, repeatQueue chan *Task) {
 					done <- w
 				}()
 
-				nextAttempt := task.GetAttempts() + 1
-
 				task.setStatus(taskStatusProcess)
-				task.setAttempts(nextAttempt)
+				task.setAttempts(task.GetAttempts() + 1)
 
-				newRepeats, newDuration := task.GetFunction()(nextAttempt, task.GetArguments()...)
+				newRepeats, newDuration := w.execute(task)
 				task.SetRepeats(newRepeats)
 				task.SetDuration(newDuration)
 			}()
@@ -85,4 +81,48 @@ func (w *Worker) process(done chan *Worker, repeatQueue chan *Task) {
 			return
 		}
 	}
+}
+
+func (w *Worker) execute(task *Task) (int64, time.Duration) {
+	quit := make(chan bool, 1)
+	timeout := task.GetTimeout()
+
+	// execute with timeout
+	if timeout > 0 {
+		result := make(chan []interface{}, 1)
+
+		go func() {
+			defer func() {
+				if err := recover(); err != nil {
+					result <- []interface{}{nil, nil, err}
+				}
+			}()
+
+			repeats, duration := task.GetFunction()(task.GetAttempts(), quit, task.GetArguments()...)
+			result <- []interface{}{repeats, duration, nil}
+		}()
+
+		for {
+			select {
+			case r := <-result:
+				if r[2] != nil {
+					panic(r[2])
+				}
+
+				task.setStatus(taskStatusSuccess)
+				return r[0].(int64), r[1].(time.Duration)
+
+			case <-time.After(timeout):
+				quit <- true
+				task.setStatus(taskStatusFailByTimeout)
+				return task.GetRepeats(), task.GetDuration()
+			}
+		}
+	}
+
+	// execute without timeout
+	repeats, duration := task.GetFunction()(task.GetAttempts(), quit, task.GetArguments()...)
+	task.setStatus(taskStatusSuccess)
+
+	return repeats, duration
 }
