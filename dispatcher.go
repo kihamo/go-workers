@@ -120,3 +120,7 @@ func (d *Dispatcher) AddTaskByFunc(fn TaskFunction, args ...interface{}) *Task {
 func (d *Dispatcher) Kill() {
 	d.quit <- true
 }
+
+func (d *Dispatcher) GetTeam() *Team {
+	return d.team
+}

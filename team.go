@@ -67,6 +67,13 @@ func (p *Team) Pop() interface{} {
 	return member
 }
 
+func (p *Team) GetMembers() []*Worker {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	return p.members
+}
+
 func (p *Team) GetIndexById(id string) int {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()

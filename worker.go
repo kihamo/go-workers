@@ -16,11 +16,11 @@ type Worker struct {
 	mutex     sync.RWMutex
 	waitGroup *sync.WaitGroup
 
-	id      string
-	status  int64
-	created time.Time
-	newTask chan *Task
-	quit    chan bool
+	id        string
+	status    int64
+	createdAt time.Time
+	newTask   chan *Task
+	quit      chan bool
 }
 
 func NewWorker() *Worker {
@@ -29,7 +29,7 @@ func NewWorker() *Worker {
 	return &Worker{
 		id:        id,
 		status:    WorkerStatusWait,
-		created:   time.Now(),
+		createdAt: time.Now(),
 		waitGroup: new(sync.WaitGroup),
 		newTask:   make(chan *Task, 1),
 		quit:      make(chan bool),
@@ -134,6 +134,27 @@ func (w *Worker) Kill() {
 
 func (w *Worker) sendTask(task *Task) {
 	w.newTask <- task
+}
+
+func (w *Worker) GetId() string {
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
+
+	return w.id
+}
+
+func (w *Worker) GetStatus() int64 {
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
+
+	return w.status
+}
+
+func (w *Worker) GetCreatedAt() time.Time {
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
+
+	return w.createdAt
 }
 
 func (w *Worker) setStatus(status int64) {
