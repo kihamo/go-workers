@@ -19,15 +19,14 @@ type Worker struct {
 	id        string
 	status    int64
 	createdAt time.Time
+	task      *Task
 	newTask   chan *Task
 	quit      chan bool
 }
 
 func NewWorker() *Worker {
-	id := uuid.New()
-
 	return &Worker{
-		id:        id,
+		id:        uuid.New(),
 		status:    WorkerStatusWait,
 		createdAt: time.Now(),
 		waitGroup: new(sync.WaitGroup),
@@ -43,37 +42,28 @@ func (w *Worker) process(done chan *Worker, repeatQueue chan *Task) {
 			w.waitGroup.Add(1)
 
 			w.setStatus(WorkerStatusBusy)
+			w.setTask(task)
 
+			task.setLastError(nil)
 			if task.GetStatus() != TaskStatusRepeatWait {
 				task.setAttempts(0)
 			}
 
 			func() {
-				defer func() {
-					task.setFinishedTime(time.Now())
-
-					if err := recover(); err != nil {
-						task.setStatus(TaskStatusFail)
-						task.setLastError(err)
-					}
-
-					repeats := task.GetRepeats()
-					if repeats == -1 || task.GetAttempts() < repeats {
-						task.setStatus(TaskStatusRepeatWait)
-						repeatQueue <- task
-					}
-
-					w.waitGroup.Done()
-					w.setStatus(WorkerStatusWait)
-					done <- w
-				}()
-
 				task.setStatus(TaskStatusProcess)
 				task.setAttempts(task.GetAttempts() + 1)
 
-				newRepeats, newDuration := w.execute(task)
-				task.SetRepeats(newRepeats)
-				task.SetDuration(newDuration)
+				w.execute(task)
+
+				repeats := task.GetRepeats()
+				if repeats == -1 || task.GetAttempts() < repeats {
+					task.setStatus(TaskStatusRepeatWait)
+					repeatQueue <- task
+				}
+
+				w.waitGroup.Done()
+				w.setStatus(WorkerStatusWait)
+				done <- w
 			}()
 
 		case <-w.quit:
@@ -84,52 +74,81 @@ func (w *Worker) process(done chan *Worker, repeatQueue chan *Task) {
 	}
 }
 
-func (w *Worker) execute(task *Task) (int64, time.Duration) {
+func (w *Worker) execute(task *Task) {
+	defer func() {
+		task.setFinishedTime(time.Now())
+
+		if err := recover(); err != nil {
+			task.setStatus(TaskStatusFail)
+			task.setLastError(err)
+		}
+	}()
+
 	quit := make(chan bool, 1)
 	timeout := task.GetTimeout()
 
 	// execute with timeout
 	if timeout > 0 {
-		result := make(chan []interface{}, 1)
+		resultChan := make(chan []interface{}, 1)
+		errorChan := make(chan interface{}, 1)
 
 		go func() {
 			defer func() {
 				if err := recover(); err != nil {
-					result <- []interface{}{nil, nil, err}
+					errorChan <- err
 				}
 			}()
 
 			repeats, duration := task.GetFunction()(task.GetAttempts(), quit, task.GetArguments()...)
-			result <- []interface{}{repeats, duration, nil}
+			resultChan <- []interface{}{repeats, duration}
 		}()
 
 		for {
 			select {
-			case r := <-result:
-				if r[2] != nil {
-					panic(r[2])
-				}
-
+			case r := <-resultChan:
 				task.setStatus(TaskStatusSuccess)
-				return r[0].(int64), r[1].(time.Duration)
+				task.SetRepeats(r[0].(int64))
+				task.SetDuration(r[1].(time.Duration))
+				return
+
+			case err := <-errorChan:
+				task.setStatus(TaskStatusFail)
+				task.setLastError(err)
+				return
 
 			case <-time.After(timeout):
 				quit <- true
+
 				task.setStatus(TaskStatusFailByTimeout)
-				return task.GetRepeats(), task.GetDuration()
+				return
 			}
 		}
 	}
 
 	// execute without timeout
-	repeats, duration := task.GetFunction()(task.GetAttempts(), quit, task.GetArguments()...)
-	task.setStatus(TaskStatusSuccess)
+	newRepeats, newDuration := task.GetFunction()(task.GetAttempts(), quit, task.GetArguments()...)
 
-	return repeats, duration
+	task.setStatus(TaskStatusSuccess)
+	task.SetRepeats(newRepeats)
+	task.SetDuration(newDuration)
 }
 
 func (w *Worker) Kill() {
 	w.quit <- true
+}
+
+func (w *Worker) GetTask() *Task {
+	w.mutex.RLock()
+	defer w.mutex.RUnlock()
+
+	return w.task
+}
+
+func (w *Worker) setTask(task *Task) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	w.task = task
 }
 
 func (w *Worker) sendTask(task *Task) {

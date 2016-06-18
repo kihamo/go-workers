@@ -12,7 +12,9 @@ type Dispatcher struct {
 	mutex     sync.RWMutex
 	waitGroup *sync.WaitGroup
 
-	team        *Team
+	workers *Workers
+	tasks   *Tasks
+
 	workersBusy int
 
 	newQueue     chan *Task // очередь новых заданий
@@ -28,7 +30,9 @@ func NewDispatcher() *Dispatcher {
 	return &Dispatcher{
 		waitGroup: new(sync.WaitGroup),
 
-		team:        NewTeam(),
+		workers: NewWorkers(),
+		tasks:   NewTasks(),
+
 		workersBusy: 0,
 
 		newQueue:     make(chan *Task),
@@ -51,28 +55,31 @@ func (d *Dispatcher) Run() {
 		}
 	}()
 
-	heap.Init(d.team)
+	heap.Init(d.workers)
 
 	for {
 		select {
 		// пришел новый таск на выполнение от flow контроллера
 		case task := <-d.executeQueue:
-			worker := heap.Pop(d.team).(*Worker)
+			worker := heap.Pop(d.workers).(*Worker)
 			worker.sendTask(task)
-			heap.Push(d.team, worker)
+			heap.Push(d.workers, worker)
 
 			// проверяем есть ли еще свободные исполнители для задач
-			if d.workersBusy++; d.workersBusy < d.team.Len() {
+			if d.workersBusy++; d.workersBusy < d.workers.Len() {
 				d.allowProcessing <- true
 			}
 
 		// пришло уведомление, что рабочий закончил выполнение задачи
 		case worker := <-d.done:
-			heap.Remove(d.team, d.team.GetIndexById(worker.id))
-			heap.Push(d.team, worker)
+			heap.Remove(d.workers, d.workers.GetIndexById(worker.GetId()))
+			heap.Push(d.workers, worker)
+
+			d.tasks.removeById(worker.GetTask().GetId())
+			worker.setTask(nil)
 
 			// проверяем не освободился ли какой-нибудь исполнитель
-			if d.workersBusy--; d.workersBusy == d.team.Len()-1 {
+			if d.workersBusy--; d.workersBusy == d.workers.Len()-1 {
 				d.allowProcessing <- true
 			}
 
@@ -87,7 +94,7 @@ func (d *Dispatcher) Run() {
 	}
 }
 
-func (d *Dispatcher) AddWorker() {
+func (d *Dispatcher) AddWorker() *Worker {
 	w := NewWorker()
 
 	d.waitGroup.Add(1)
@@ -97,11 +104,18 @@ func (d *Dispatcher) AddWorker() {
 		w.process(d.done, d.repeatQueue)
 	}()
 
-	heap.Push(d.team, w)
+	heap.Push(d.workers, w)
+
+	return w
+}
+
+func (d *Dispatcher) GetWorkers() *Workers {
+	return d.workers
 }
 
 func (d *Dispatcher) AddTask(task *Task) {
 	time.AfterFunc(task.GetDuration(), func() {
+		d.tasks.Push(task)
 		d.newQueue <- task
 	})
 }
@@ -117,10 +131,10 @@ func (d *Dispatcher) AddTaskByFunc(fn TaskFunction, args ...interface{}) *Task {
 	return d.AddNamedTaskByFunc(runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name(), fn, args...)
 }
 
-func (d *Dispatcher) Kill() {
-	d.quit <- true
+func (d *Dispatcher) GetTasks() *Tasks {
+	return d.tasks
 }
 
-func (d *Dispatcher) GetTeam() *Team {
-	return d.team
+func (d *Dispatcher) Kill() {
+	d.quit <- true
 }
