@@ -18,11 +18,10 @@ type Worker interface {
 	Run()
 	Kill()
 	Reset()
-	GetTask() task.Tasker
 	SendTask(task.Tasker)
+	GetTask() task.Tasker
 	GetId() string
 	GetStatus() int64
-	SetStatus(int64)
 	GetCreatedAt() time.Time
 }
 
@@ -56,22 +55,23 @@ func NewWorker(d chan Worker) *Workman {
 
 func (m *Workman) Run() {
 	defer func() {
-		m.SetStatus(WorkerStatusWait)
+		m.setStatus(WorkerStatusWait)
 		m.done <- m
 	}()
+
+	m.setStatus(WorkerStatusProcess)
 
 	for {
 		select {
 		case task := <-m.newTask:
 			m.wg.Add(1)
+			m.setStatus(WorkerStatusBusy)
 
-			m.SetStatus(WorkerStatusProcess)
 			m.setTask(task)
-
 			go m.processTask()
 
 		case <-m.kill:
-			if m.GetStatus() == WorkerStatusProcess {
+			if m.GetStatus() == WorkerStatusBusy {
 				m.killTask <- true
 			}
 
@@ -94,7 +94,7 @@ func (m *Workman) processTask() {
 
 	m.executeTask()
 
-	m.SetStatus(WorkerStatusWait)
+	m.setStatus(WorkerStatusWait)
 	m.kill <- true
 }
 
@@ -211,7 +211,7 @@ func (m *Workman) GetStatus() int64 {
 	return m.status
 }
 
-func (m *Workman) SetStatus(s int64) {
+func (m *Workman) setStatus(s int64) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

@@ -54,14 +54,6 @@ func (suite *WorkerSuite) Test_WorkerGetCreateAt_ReturnsCreateAtTime() {
 	assert.IsType(suite.T(), time.Time{}, w.GetCreatedAt())
 }
 
-func (suite *WorkerSuite) Test_WorkerSetStatus_ReturnsChangeStatus() {
-	done := make(chan Worker)
-	w := NewWorker(done)
-	w.SetStatus(WorkerStatusBusy)
-
-	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusBusy)
-}
-
 func (suite *WorkerSuite) Test_WorkerSetTask_Success() {
 	t := task.NewTask("job", 0, time.Second, 1, workerJob)
 	done := make(chan Worker)
@@ -71,7 +63,26 @@ func (suite *WorkerSuite) Test_WorkerSetTask_Success() {
 	assert.Equal(suite.T(), w.GetTask(), t)
 }
 
-func (suite *WorkerSuite) Test_WorkerWithTask_ReturnStatusIsProcess() {
+func (suite *WorkerSuite) Test_WorkerIsNotRunning_ReturnStatusIsWait() {
+	done := make(chan Worker)
+	w := NewWorker(done)
+
+	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusWait)
+	w.Kill()
+}
+
+func (suite *WorkerSuite) Test_WorkerIsRunning_ReturnStatusIsProcess() {
+	done := make(chan Worker)
+	w := NewWorker(done)
+	go w.Run()
+
+	time.Sleep(time.Second)
+
+	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusProcess)
+	w.Kill()
+}
+
+func (suite *WorkerSuite) Test_WorkerIsRunningAndSendTask_ReturnStatusIsBusy() {
 	t := task.NewTask("job", 0, 0, 1, workerJobSleepSixSeconds)
 	done := make(chan Worker)
 	w := NewWorker(done)
@@ -80,7 +91,7 @@ func (suite *WorkerSuite) Test_WorkerWithTask_ReturnStatusIsProcess() {
 
 	time.Sleep(time.Second)
 
-	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusProcess)
+	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusBusy)
 	w.Kill()
 }
 
