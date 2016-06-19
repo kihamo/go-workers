@@ -21,12 +21,6 @@ func (s *TaskSuite) job(attempts int64, quit chan bool, args ...interface{}) (in
 	return 1, time.Second
 }
 
-func (s *TaskSuite) Test_NewInstance_GetFunctionReturnsFunction() {
-	t := NewTask(s.job)
-
-	assert.Equal(s.T(), t.GetFunction(), TaskFunction(s.job))
-}
-
 func (s *TaskSuite) Test_NewInstance_GetArgumentsReturnsArguments() {
 	t := NewTask(s.job, 1, 2)
 
