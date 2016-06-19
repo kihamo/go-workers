@@ -4,13 +4,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/task"
+	"github.com/pivotal-golang/clock/fakeclock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type WorkerSuite struct {
 	suite.Suite
+	clock time.Time
+}
+
+func (s *WorkerSuite) SetupTest() {
+	s.clock = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
+	workers.Clock = fakeclock.NewFakeClock(s.clock)
 }
 
 func TestWorkerSuite(t *testing.T) {
@@ -93,6 +101,24 @@ func (suite *WorkerSuite) Test_WorkerIsRunningAndSendTask_ReturnStatusIsBusy() {
 
 	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusBusy)
 	w.Kill()
+}
+
+func (suite *WorkerSuite) Test_WorkerReset_ReturnEmptyTask() {
+	t := task.NewTask("job", 0, 0, 1, workerJob)
+	done := make(chan Worker)
+	w := NewWorker(done)
+	go w.Run()
+	w.SendTask(t)
+
+	for {
+		select {
+		case <-done:
+			assert.NotNil(suite.T(), w.GetTask())
+			w.Reset()
+			assert.Nil(suite.T(), w.GetTask())
+			return
+		}
+	}
 }
 
 func (suite *WorkerSuite) Test_WorkerKill_ReturnStatusIsWait() {

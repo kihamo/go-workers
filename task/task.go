@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kihamo/go-workers"
 	"github.com/pborman/uuid"
 )
 
@@ -69,7 +70,7 @@ func NewTask(n string, d time.Duration, t time.Duration, r int64, f TaskFunction
 		id:        uuid.New(),
 		status:    TaskStatusWait,
 		attempts:  0,
-		createdAt: time.Now(),
+		createdAt: workers.Clock.Now(),
 	}
 }
 

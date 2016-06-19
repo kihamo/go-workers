@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/task"
 	"github.com/pborman/uuid"
 )
@@ -44,7 +45,7 @@ func NewWorker(d chan Worker) *Workman {
 	return &Workman{
 		id:        uuid.New(),
 		status:    WorkerStatusWait,
-		createdAt: time.Now(),
+		createdAt: workers.Clock.Now(),
 		kill:      make(chan bool, 1),
 		done:      d,
 
@@ -110,7 +111,7 @@ func (m *Workman) executeTask() {
 
 	go func() {
 		defer func() {
-			t.SetFinishedTime(time.Now())
+			t.SetFinishedTime(workers.Clock.Now())
 
 			if err := recover(); err != nil {
 				errorChan <- err
