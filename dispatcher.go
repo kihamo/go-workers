@@ -60,6 +60,7 @@ func (d *Dispatcher) Run() {
 		// пришел новый таск на выполнение от flow контроллера
 		case task := <-d.executeQueue:
 			worker := heap.Pop(d.workers).(*Worker)
+			d.runWorker(worker)
 			worker.sendTask(task)
 			heap.Push(d.workers, worker)
 
@@ -98,17 +99,17 @@ func (d *Dispatcher) Run() {
 
 func (d *Dispatcher) AddWorker() *Worker {
 	w := NewWorker(d.done)
-
-	d.waitGroup.Add(1)
-	go func() {
-		defer d.waitGroup.Done()
-
-		w.run()
-	}()
-
 	heap.Push(d.workers, w)
 
 	return w
+}
+
+func (d *Dispatcher) runWorker(worker *Worker) {
+	d.waitGroup.Add(1)
+	go func() {
+		defer d.waitGroup.Done()
+		worker.run()
+	}()
 }
 
 func (d *Dispatcher) GetWorkers() *Workers {

@@ -9,21 +9,23 @@ import (
 
 const (
 	WorkerStatusWait = int64(iota)
+	WorkerStatusProcess
 	WorkerStatusBusy
 )
 
 type Worker struct {
 	mutex sync.RWMutex
+	wg    sync.WaitGroup
 
 	id        string
 	status    int64
 	createdAt time.Time
-	task      *Task
-	newTask   chan *Task
-	quit      chan bool
 	kill      chan bool
+	done      chan *Worker
 
-	done chan *Worker
+	task     *Task
+	newTask  chan *Task
+	killTask chan bool
 }
 
 func NewWorker(done chan *Worker) *Worker {
@@ -31,31 +33,42 @@ func NewWorker(done chan *Worker) *Worker {
 		id:        uuid.New(),
 		status:    WorkerStatusWait,
 		createdAt: time.Now(),
-		newTask:   make(chan *Task, 1),
-		quit:      make(chan bool, 1),
 		kill:      make(chan bool, 1),
 		done:      done,
+
+		newTask:  make(chan *Task, 1),
+		killTask: make(chan bool, 1),
 	}
 }
 
 func (w *Worker) run() {
+	defer func() {
+		w.setStatus(WorkerStatusWait)
+		w.done <- w
+	}()
+
 	for {
 		select {
 		case task := <-w.newTask:
+			w.wg.Add(1)
+
+			w.setStatus(WorkerStatusProcess)
+			w.setTask(task)
+
 			go w.processTask(task)
 
 		case <-w.kill:
-			w.quit <- true
-			w.setStatus(WorkerStatusWait)
+			if w.GetStatus() == WorkerStatusProcess {
+				w.killTask <- true
+			}
+
+			w.wg.Wait()
 			return
 		}
 	}
 }
 
 func (w *Worker) processTask(task *Task) {
-	w.setStatus(WorkerStatusBusy)
-	w.setTask(task)
-
 	task.setLastError(nil)
 	if task.GetStatus() != TaskStatusRepeatWait {
 		task.setAttempts(0)
@@ -67,17 +80,12 @@ func (w *Worker) processTask(task *Task) {
 	w.executeTask(task)
 
 	w.setStatus(WorkerStatusWait)
-	w.done <- w
+	w.kill <- true
 }
 
 func (w *Worker) executeTask(task *Task) {
 	defer func() {
-		task.setFinishedTime(time.Now())
-
-		if err := recover(); err != nil {
-			task.setStatus(TaskStatusFail)
-			task.setLastError(err)
-		}
+		w.wg.Done()
 	}()
 
 	resultChan := make(chan []interface{}, 1)
@@ -86,6 +94,8 @@ func (w *Worker) executeTask(task *Task) {
 
 	go func() {
 		defer func() {
+			task.setFinishedTime(time.Now())
+
 			if err := recover(); err != nil {
 				errorChan <- err
 			}
@@ -112,7 +122,7 @@ func (w *Worker) executeTask(task *Task) {
 				task.setLastError(err)
 				return
 
-			case <-w.quit:
+			case <-w.killTask:
 				quitChan <- true
 				task.setStatus(TaskStatusKill)
 				return
@@ -136,7 +146,7 @@ func (w *Worker) executeTask(task *Task) {
 				task.setLastError(err)
 				return
 
-			case <-w.quit:
+			case <-w.killTask:
 				quitChan <- true
 				task.setStatus(TaskStatusKill)
 				return
