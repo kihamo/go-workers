@@ -59,7 +59,7 @@ func (s *TaskSuite) Test_SetDurationFiveSecond_GetDurationReturnsFiveSecond() {
 func (s *TaskSuite) Test_NewInstance_GetRepeatsReturnsOnce() {
 	t := NewTask(s.job)
 
-	assert.Equal(s.T(), t.GetRepeats(), 1)
+	assert.Equal(s.T(), t.GetRepeats(), int64(1))
 }
 
 func (s *TaskSuite) Test_SetRepeatsTwice_GetRepeatReturnsTwice() {
@@ -67,13 +67,13 @@ func (s *TaskSuite) Test_SetRepeatsTwice_GetRepeatReturnsTwice() {
 
 	t.SetRepeats(2)
 
-	assert.Equal(s.T(), t.GetRepeats(), 2)
+	assert.Equal(s.T(), t.GetRepeats(), int64(2))
 }
 
 func (s *TaskSuite) Test_NewInstance_GetAttemptsReturnsZero() {
 	t := NewTask(s.job)
 
-	assert.Equal(s.T(), t.GetAttempts(), 0)
+	assert.Equal(s.T(), t.GetAttempts(), int64(0))
 }
 
 func (s *TaskSuite) Test_SetAttemptsOnce_GetAttemptsReturnsOnce() {
@@ -81,7 +81,7 @@ func (s *TaskSuite) Test_SetAttemptsOnce_GetAttemptsReturnsOnce() {
 
 	t.SetAttempts(1)
 
-	assert.Equal(s.T(), t.GetAttempts(), 1)
+	assert.Equal(s.T(), t.GetAttempts(), int64(1))
 }
 
 func (s *TaskSuite) Test_NewInstance_GetStatusReturnsStatusWait() {
