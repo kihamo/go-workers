@@ -19,5 +19,5 @@ script:
   - go test -v ./...
 
 after_success:
-  - .generate_coverage.sh
-  - $HOME/gopath/bin/goveralls -coverprofile=full_cov.out -service=travis-ci
+  - ./.generate_coverage.sh
+  - $HOME/gopath/bin/goveralls -coverprofile=cover.out -service=travis-ci

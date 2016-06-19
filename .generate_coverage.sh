@@ -1,8 +1,6 @@
 #!/bin/bash -e
 # Require installation of: `github.com/wadey/gocovmerge`
 
-set -x
-
 cd $GOPATH/src/github.com/kihamo/go-workers
 
 rm -rf ./cov
@@ -17,5 +15,5 @@ if ls $dir/*.go &> /dev/null; then
 fi
 done
 
-gocovmerge ./cov/*.out > full_cov.out
+gocovmerge ./cov/*.out > cover.out
 rm -rf ./cov
