@@ -13,6 +13,7 @@ const (
 	TaskStatusSuccess
 	TaskStatusFail
 	TaskStatusFailByTimeout
+	TaskStatusKill
 	TaskStatusRepeatWait
 )
 

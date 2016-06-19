@@ -19,7 +19,6 @@ type Dispatcher struct {
 
 	newQueue     chan *Task // очередь новых заданий
 	executeQueue chan *Task // очередь выполняемых заданий
-	repeatQueue  chan *Task // канал уведомления о повторном выполнении заданий
 
 	done            chan *Worker // канал уведомления о завершении выполнения заданий
 	quit            chan bool    // канал для завершения диспетчера
@@ -37,10 +36,9 @@ func NewDispatcher() *Dispatcher {
 
 		newQueue:     make(chan *Task),
 		executeQueue: make(chan *Task),
-		repeatQueue:  make(chan *Task),
 
 		done:            make(chan *Worker),
-		quit:            make(chan bool),
+		quit:            make(chan bool, 1),
 		allowProcessing: make(chan bool),
 	}
 }
@@ -75,17 +73,21 @@ func (d *Dispatcher) Run() {
 			heap.Remove(d.workers, d.workers.GetIndexById(worker.GetId()))
 			heap.Push(d.workers, worker)
 
-			d.tasks.removeById(worker.GetTask().GetId())
+			task := worker.GetTask()
+
+			d.tasks.removeById(task.GetId())
 			worker.setTask(nil)
+
+			repeats := task.GetRepeats()
+			if repeats == -1 || task.GetAttempts() < repeats {
+				task.setStatus(TaskStatusRepeatWait)
+				d.AddTask(task)
+			}
 
 			// проверяем не освободился ли какой-нибудь исполнитель
 			if d.workersBusy--; d.workersBusy == d.workers.Len()-1 {
 				d.allowProcessing <- true
 			}
-
-		// пришло уведомление, что необходимо повторить задачу
-		case task := <-d.repeatQueue:
-			d.AddTask(task)
 
 		case <-d.quit:
 			d.waitGroup.Wait()
@@ -95,13 +97,13 @@ func (d *Dispatcher) Run() {
 }
 
 func (d *Dispatcher) AddWorker() *Worker {
-	w := NewWorker()
+	w := NewWorker(d.done)
 
 	d.waitGroup.Add(1)
 	go func() {
 		defer d.waitGroup.Done()
 
-		w.process(d.done, d.repeatQueue)
+		w.run()
 	}()
 
 	heap.Push(d.workers, w)
@@ -121,7 +123,7 @@ func (d *Dispatcher) AddTask(task *Task) {
 }
 
 func (d *Dispatcher) AddNamedTaskByFunc(name string, fn TaskFunction, args ...interface{}) *Task {
-	task := NewTask(name, time.Duration(0), time.Duration(0), 1, fn, args)
+	task := NewTask(name, 0, 0, 1, fn, args)
 	d.AddTask(task)
 
 	return task
