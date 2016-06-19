@@ -1,4 +1,4 @@
-package workers
+package collection
 
 import (
 	"sync"
@@ -72,34 +72,34 @@ func (h *Heap) GetItems() []HeapItem {
 	return h.items
 }
 
-func (h *Heap) GetIndexById(id string) int {
+func (h *Heap) GetIndexById(i string) int {
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()
 
-	if v, ok := h.positions[id]; ok {
+	if v, ok := h.positions[i]; ok {
 		return v
 	}
 
 	return -1
 }
 
-func (h *Heap) remove(position int) {
+func (h *Heap) Remove(p int) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 
-	if position > len(h.positions)-1 {
+	if p > len(h.positions)-1 {
 		return
 	}
 
-	item := h.items[position]
+	item := h.items[p]
 
-	h.items = append(h.items[:position], h.items[position+1:]...)
+	h.items = append(h.items[:p], h.items[p+1:]...)
 	delete(h.positions, item.GetId())
 }
 
-func (h *Heap) removeById(id string) {
-	position := h.GetIndexById(id)
+func (h *Heap) RemoveById(i string) {
+	position := h.GetIndexById(i)
 	if position != -1 {
-		h.remove(position)
+		h.Remove(position)
 	}
 }
