@@ -25,73 +25,72 @@ func TestWorkerSuite(t *testing.T) {
 	suite.Run(t, new(WorkerSuite))
 }
 
-func workerJob(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+func (s *WorkerSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
 	return 1, time.Second
 }
 
-func workerJobSleepSixSeconds(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+func (s *WorkerSuite) jobSleepSixSeconds(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
 	time.Sleep(time.Second * 6)
 	return 1, time.Second
 }
 
-func workerJobReturnsPanic(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+func (s *WorkerSuite) jobReturnsPanic(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
 	panic("Panic!!!")
 }
 
-func (suite *WorkerSuite) Test_WorkerNewInstance_ReturnsStatusIsWait() {
+func (s *WorkerSuite) Test_NewInstance_ReturnsStatusIsWait() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 
-	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusWait)
+	assert.Equal(s.T(), w.GetStatus(), WorkerStatusWait)
 }
 
-func (suite *WorkerSuite) Test_WorkerGetId_ReturnsId() {
+func (s *WorkerSuite) Test_GetId_ReturnsId() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 
-	assert.Equal(suite.T(), w.GetId(), w.id)
-	assert.IsType(suite.T(), "", w.GetId())
-	assert.NotEmpty(suite.T(), w.GetId())
+	assert.IsType(s.T(), "", w.GetId())
+	assert.NotEmpty(s.T(), w.GetId())
 }
 
-func (suite *WorkerSuite) Test_WorkerGetCreateAt_ReturnsCreateAtTime() {
+func (s *WorkerSuite) Test_GetCreateAt_ReturnsCreateAtTime() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 
-	assert.Equal(suite.T(), w.GetCreatedAt(), w.createdAt)
-	assert.IsType(suite.T(), time.Time{}, w.GetCreatedAt())
+	assert.Equal(s.T(), w.GetCreatedAt(), w.createdAt)
+	assert.IsType(s.T(), time.Time{}, w.GetCreatedAt())
 }
 
-func (suite *WorkerSuite) Test_WorkerSetTask_Success() {
-	t := task.NewTask("job", 0, time.Second, 1, workerJob)
+func (s *WorkerSuite) Test_SetTask_Success() {
+	t := task.NewTask(s.job)
 	done := make(chan Worker)
 	w := NewWorker(done)
 	w.setTask(t)
 
-	assert.Equal(suite.T(), w.GetTask(), t)
+	assert.Equal(s.T(), w.GetTask(), t)
 }
 
-func (suite *WorkerSuite) Test_WorkerIsNotRunning_ReturnStatusIsWait() {
+func (s *WorkerSuite) Test_IsNotRunning_ReturnStatusIsWait() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 
-	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusWait)
+	assert.Equal(s.T(), w.GetStatus(), WorkerStatusWait)
 	w.Kill()
 }
 
-func (suite *WorkerSuite) Test_WorkerIsRunning_ReturnStatusIsProcess() {
+func (s *WorkerSuite) Test_IsRunning_ReturnStatusIsProcess() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
 
 	time.Sleep(time.Second)
 
-	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusProcess)
+	assert.Equal(s.T(), w.GetStatus(), WorkerStatusProcess)
 	w.Kill()
 }
 
-func (suite *WorkerSuite) Test_WorkerIsRunningAndSendTask_ReturnStatusIsBusy() {
-	t := task.NewTask("job", 0, 0, 1, workerJobSleepSixSeconds)
+func (s *WorkerSuite) Test_IsRunningAndSendTask_ReturnStatusIsBusy() {
+	t := task.NewTask(s.jobSleepSixSeconds)
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
@@ -99,12 +98,12 @@ func (suite *WorkerSuite) Test_WorkerIsRunningAndSendTask_ReturnStatusIsBusy() {
 
 	time.Sleep(time.Second)
 
-	assert.Equal(suite.T(), w.GetStatus(), WorkerStatusBusy)
+	assert.Equal(s.T(), w.GetStatus(), WorkerStatusBusy)
 	w.Kill()
 }
 
-func (suite *WorkerSuite) Test_WorkerReset_ReturnEmptyTask() {
-	t := task.NewTask("job", 0, 0, 1, workerJob)
+func (s *WorkerSuite) Test_Reset_ReturnEmptyTask() {
+	t := task.NewTask(s.job)
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
@@ -113,16 +112,16 @@ func (suite *WorkerSuite) Test_WorkerReset_ReturnEmptyTask() {
 	for {
 		select {
 		case <-done:
-			assert.NotNil(suite.T(), w.GetTask())
+			assert.NotNil(s.T(), w.GetTask())
 			w.Reset()
-			assert.Nil(suite.T(), w.GetTask())
+			assert.Nil(s.T(), w.GetTask())
 			return
 		}
 	}
 }
 
-func (suite *WorkerSuite) Test_WorkerKill_ReturnStatusIsWait() {
-	t := task.NewTask("job", 0, 0, 1, workerJobSleepSixSeconds)
+func (s *WorkerSuite) Test_Kill_ReturnStatusIsWait() {
+	t := task.NewTask(s.jobSleepSixSeconds)
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
@@ -137,17 +136,17 @@ func (suite *WorkerSuite) Test_WorkerKill_ReturnStatusIsWait() {
 				sendKillSignal = true
 			}
 		case <-done:
-			assert.Equal(suite.T(), w.GetStatus(), WorkerStatusWait)
+			assert.Equal(s.T(), w.GetStatus(), WorkerStatusWait)
 			return
 		}
 	}
 }
 
-func (suite *WorkerSuite) Test_WorkerWithTaskReturnsPanic_SetTaskStatusIsFail() {
+func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetTaskStatusIsFail() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
-	t := task.NewTask("job", 0, 0, 1, workerJobReturnsPanic)
+	t := task.NewTask(s.jobReturnsPanic)
 	sendTask := false
 
 	for {
@@ -159,17 +158,18 @@ func (suite *WorkerSuite) Test_WorkerWithTaskReturnsPanic_SetTaskStatusIsFail() 
 			}
 
 		case <-done:
-			assert.Equal(suite.T(), t.GetStatus(), task.TaskStatusFail)
+			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusFail)
 			return
 		}
 	}
 }
 
-func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeoutAndReturnsPanic_SetTaskStatusIsFail() {
+func (s *WorkerSuite) Test_WithTaskWithTimeoutAndReturnsPanic_SetTaskStatusIsFail() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
-	t := task.NewTask("job", 0, time.Second*10, 0, workerJobReturnsPanic)
+	t := task.NewTask(s.jobReturnsPanic)
+	t.SetTimeout(time.Second * 10)
 	sendTask := false
 
 	for {
@@ -181,45 +181,17 @@ func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeoutAndReturnsPanic_SetTaskS
 			}
 
 		case <-done:
-			assert.Equal(suite.T(), t.GetStatus(), task.TaskStatusFail)
+			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusFail)
 			return
 		}
 	}
 }
 
-func (suite *WorkerSuite) Test_WorkerWithTask_SetTaskStatusIsKillIfWorkerKill() {
+func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsKillIfWorkerKill() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
-	t := task.NewTask("job", 0, 0, 0, workerJobSleepSixSeconds)
-	sendTask := false
-	sendKillSignal := false
-
-	for {
-		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				w.SendTask(t)
-				sendTask = true
-				continue
-			}
-
-			if !sendKillSignal {
-				w.Kill()
-			}
-
-		case <-done:
-			assert.Equal(suite.T(), t.GetStatus(), task.TaskStatusKill)
-			return
-		}
-	}
-}
-
-func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeout_SetTaskStatusIsKillIfWorkerKill() {
-	done := make(chan Worker)
-	w := NewWorker(done)
-	go w.Run()
-	t := task.NewTask("job", 0, time.Second*10, 0, workerJobSleepSixSeconds)
+	t := task.NewTask(s.jobSleepSixSeconds)
 	sendTask := false
 	sendKillSignal := false
 
@@ -237,17 +209,47 @@ func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeout_SetTaskStatusIsKillIfWo
 			}
 
 		case <-done:
-			assert.Equal(suite.T(), t.GetStatus(), task.TaskStatusKill)
+			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusKill)
 			return
 		}
 	}
 }
 
-func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeout_SetTaskStatusIsFailTimeout() {
+func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsKillIfWorkerKill() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
-	t := task.NewTask("job", 0, time.Second*1, 1, workerJobSleepSixSeconds)
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetTimeout(time.Second * 10)
+	sendTask := false
+	sendKillSignal := false
+
+	for {
+		select {
+		case <-time.After(time.Second):
+			if !sendTask {
+				w.SendTask(t)
+				sendTask = true
+				continue
+			}
+
+			if !sendKillSignal {
+				w.Kill()
+			}
+
+		case <-done:
+			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusKill)
+			return
+		}
+	}
+}
+
+func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsFailTimeout() {
+	done := make(chan Worker)
+	w := NewWorker(done)
+	go w.Run()
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetTimeout(time.Second)
 	sendTask := false
 
 	for {
@@ -259,17 +261,17 @@ func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeout_SetTaskStatusIsFailTime
 			}
 
 		case <-done:
-			assert.Equal(suite.T(), t.GetStatus(), task.TaskStatusFailByTimeout)
+			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusFailByTimeout)
 			return
 		}
 	}
 }
 
-func (suite *WorkerSuite) Test_WorkerWithTask_SetTaskStatusIsSuccess() {
+func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsSuccess() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
-	t := task.NewTask("job", 0, 0, 1, workerJob)
+	t := task.NewTask(s.job)
 	sendTask := false
 
 	for {
@@ -281,17 +283,18 @@ func (suite *WorkerSuite) Test_WorkerWithTask_SetTaskStatusIsSuccess() {
 			}
 
 		case <-done:
-			assert.Equal(suite.T(), t.GetStatus(), task.TaskStatusSuccess)
+			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusSuccess)
 			return
 		}
 	}
 }
 
-func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeout_SetTaskStatusIsSuccess() {
+func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
 	done := make(chan Worker)
 	w := NewWorker(done)
 	go w.Run()
-	t := task.NewTask("job", 0, time.Second*10, 1, workerJobSleepSixSeconds)
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetTimeout(time.Second * 10)
 	sendTask := false
 
 	for {
@@ -303,7 +306,7 @@ func (suite *WorkerSuite) Test_WorkerWithTaskWithTimeout_SetTaskStatusIsSuccess(
 			}
 
 		case <-done:
-			assert.Equal(suite.T(), t.GetStatus(), task.TaskStatusSuccess)
+			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusSuccess)
 			return
 		}
 	}

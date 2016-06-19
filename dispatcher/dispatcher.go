@@ -127,15 +127,17 @@ func (d *Dispatcher) AddTask(t task.Tasker) {
 	})
 }
 
-func (d *Dispatcher) AddNamedTaskByFunc(name string, fn task.TaskFunction, args ...interface{}) task.Tasker {
-	task := task.NewTask(name, 0, 0, 1, fn, args)
+func (d *Dispatcher) AddNamedTaskByFunc(n string, f task.TaskFunction, a ...interface{}) task.Tasker {
+	task := task.NewTask(f, a)
+	task.SetName(n)
+
 	d.AddTask(task)
 
 	return task
 }
 
-func (d *Dispatcher) AddTaskByFunc(fn task.TaskFunction, args ...interface{}) task.Tasker {
-	return d.AddNamedTaskByFunc(runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name(), fn, args...)
+func (d *Dispatcher) AddTaskByFunc(f task.TaskFunction, a ...interface{}) task.Tasker {
+	return d.AddNamedTaskByFunc(runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name(), f, a...)
 }
 
 func (d *Dispatcher) GetTasks() *collection.Tasks {

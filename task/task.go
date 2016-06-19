@@ -19,23 +19,25 @@ const (
 )
 
 type Tasker interface {
+	GetFunction() TaskFunction
+	GetArguments() []interface{}
 	GetId() string
 	GetName() string
+	SetName(string)
 	GetDuration() time.Duration
 	SetDuration(time.Duration)
 	GetRepeats() int64
 	SetRepeats(int64)
 	GetAttempts() int64
 	SetAttempts(int64)
-	GetFunction() TaskFunction
-	GetArguments() []interface{}
 	GetStatus() int64
 	SetStatus(int64)
 	GetLastError() interface{}
 	SetLastError(interface{})
 	GetFinishedAt() *time.Time
-	SetFinishedTime(time.Time)
+	SetFinishedAt(time.Time)
 	GetTimeout() time.Duration
+	SetTimeout(time.Duration)
 }
 
 type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration)
@@ -43,35 +45,46 @@ type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration)
 type Task struct {
 	mutex sync.RWMutex
 
-	name     string
-	duration time.Duration
-	repeats  int64
-	fn       TaskFunction
-	args     []interface{}
-
+	fn         TaskFunction
+	args       []interface{}
 	id         string
-	status     int64
+	name       string
+	duration   time.Duration
+	repeats    int64
 	attempts   int64
-	createdAt  time.Time
+	status     int64
+	lastError  interface{}
 	finishedAt *time.Time
 	timeout    time.Duration
-	lastError  interface{}
+	createdAt  time.Time
 }
 
-func NewTask(n string, d time.Duration, t time.Duration, r int64, f TaskFunction, a ...interface{}) *Task {
+func NewTask(f TaskFunction, a ...interface{}) *Task {
 	return &Task{
-		name:     n,
-		duration: d,
-		timeout:  t,
-		repeats:  r,
-		fn:       f,
-		args:     a,
-
+		fn:        f,
+		args:      a,
 		id:        uuid.New(),
-		status:    TaskStatusWait,
+		duration:  0,
+		repeats:   1,
 		attempts:  0,
+		status:    TaskStatusWait,
+		timeout:   0,
 		createdAt: workers.Clock.Now(),
 	}
+}
+
+func (m *Task) GetFunction() TaskFunction {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	return m.fn
+}
+
+func (m *Task) GetArguments() []interface{} {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.args
 }
 
 func (m *Task) GetId() string {
@@ -85,7 +98,18 @@ func (m *Task) GetName() string {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
+	if m.name == "" {
+		return m.id
+	}
+
 	return m.name
+}
+
+func (m *Task) SetName(n string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.name = n
 }
 
 func (m *Task) GetDuration() time.Duration {
@@ -130,20 +154,6 @@ func (m *Task) SetAttempts(a int64) {
 	m.attempts = a
 }
 
-func (m *Task) GetFunction() TaskFunction {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.fn
-}
-
-func (m *Task) GetArguments() []interface{} {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	return m.args
-}
-
 func (m *Task) GetStatus() int64 {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -181,7 +191,7 @@ func (m *Task) GetFinishedAt() *time.Time {
 	return m.finishedAt
 }
 
-func (m *Task) SetFinishedTime(t time.Time) {
+func (m *Task) SetFinishedAt(t time.Time) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -193,4 +203,11 @@ func (m *Task) GetTimeout() time.Duration {
 	defer m.mutex.RUnlock()
 
 	return m.timeout
+}
+
+func (m *Task) SetTimeout(t time.Duration) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.timeout = t
 }

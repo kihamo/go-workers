@@ -111,7 +111,7 @@ func (m *Workman) executeTask() {
 
 	go func() {
 		defer func() {
-			t.SetFinishedTime(workers.Clock.Now())
+			t.SetFinishedAt(workers.Clock.Now())
 
 			if err := recover(); err != nil {
 				errorChan <- err
