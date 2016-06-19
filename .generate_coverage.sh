@@ -1,6 +1,8 @@
 #!/bin/bash -e
 # Require installation of: `github.com/wadey/gocovmerge`
 
+set -x
+
 cd $GOPATH/src/github.com/kihamo/go-workers
 
 rm -rf ./cov
