@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kihamo/go-workers/task"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"github.com/kihamo/go-workers/task"
 )
 
 type WorkerSuite struct {
