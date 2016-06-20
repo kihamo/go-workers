@@ -145,11 +145,6 @@ func (d *Dispatcher) GetWorkers() *collection.Workers {
 }
 
 func (d *Dispatcher) AddTask(t task.Tasker) {
-	if d.GetStatus() != DispatcherStatusProcess {
-		d.waitTasks.Push(t)
-		return
-	}
-
 	add := func() {
 		if d.GetStatus() == DispatcherStatusProcess {
 			d.tasks.Push(t)
