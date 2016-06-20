@@ -76,14 +76,16 @@ func (s *WorkerSuite) Test_FirstRun_ReturnEmptyError() {
 	go func() {
 		err = s.worker.Run()
 	}()
-	time.Sleep(time.Second)
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
 
 	assert.Nil(s.T(), err)
 }
 
 func (s *WorkerSuite) Test_TwiceRun_ReturnErrorForSecondRun() {
 	go s.worker.Run()
-	time.Sleep(time.Second)
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
 
 	err := s.worker.Run()
 
@@ -96,8 +98,8 @@ func (s *WorkerSuite) Test_IsNotRunning_ReturnStatusIsWait() {
 
 func (s *WorkerSuite) Test_IsRunning_ReturnStatusIsProcess() {
 	go s.worker.Run()
-
-	time.Sleep(time.Second)
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
 
 	assert.Equal(s.T(), s.worker.GetStatus(), WorkerStatusProcess)
 }
@@ -105,9 +107,12 @@ func (s *WorkerSuite) Test_IsRunning_ReturnStatusIsProcess() {
 func (s *WorkerSuite) Test_IsRunningAndSendTask_ReturnStatusIsBusy() {
 	t := task.NewTask(s.jobSleepSixSeconds)
 	go s.worker.Run()
-	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
 
-	time.Sleep(time.Second)
+	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
 
 	assert.Equal(s.T(), s.worker.GetStatus(), WorkerStatusBusy)
 }
@@ -130,7 +135,8 @@ func (s *WorkerSuite) Test_Reset_ReturnEmptyTask() {
 
 func (s *WorkerSuite) Test_IsRunningAndKill_ReturnEmptyError() {
 	go s.worker.Run()
-	time.Sleep(time.Second)
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
 
 	err := s.worker.Kill()
 
@@ -145,15 +151,12 @@ func (s *WorkerSuite) Test_NewInstanceAndKill_ReturnError() {
 
 func (s *WorkerSuite) Test_IsRunningTwiceKill_ReturnErrorForSecondKill() {
 	go s.worker.Run()
-
-	for stop := false; !stop; {
-		select {
-		case <-time.After(time.Second):
-			s.worker.Kill()
-		case <-s.done:
-			stop = true
-		}
+	for s.worker.GetStatus() != WorkerStatusProcess {
 	}
+	s.worker.Kill()
+	for s.worker.GetStatus() != WorkerStatusWait {
+	}
+
 	err := s.worker.Kill()
 
 	assert.Equal(s.T(), err, errors.New("Worker isn't running"))
@@ -162,57 +165,48 @@ func (s *WorkerSuite) Test_IsRunningTwiceKill_ReturnErrorForSecondKill() {
 func (s *WorkerSuite) Test_Kill_ReturnStatusIsWait() {
 	t := task.NewTask(s.jobSleepSixSeconds)
 	go s.worker.Run()
-	s.worker.SendTask(t)
-	sendKillSignal := false
-
-	for {
-		select {
-		case <-time.After(time.Second):
-			if !sendKillSignal && s.worker.GetStatus() == WorkerStatusBusy {
-				s.worker.Kill()
-				sendKillSignal = true
-			}
-		case <-s.done:
-			assert.Equal(s.T(), s.worker.GetStatus(), WorkerStatusWait)
-			return
-		}
+	for s.worker.GetStatus() != WorkerStatusProcess {
 	}
+	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
+	s.worker.Kill()
+	for s.worker.GetStatus() != WorkerStatusWait {
+	}
+
+	assert.Equal(s.T(), s.worker.GetStatus(), WorkerStatusWait)
 }
 
 func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetTaskStatusIsFail() {
 	go s.worker.Run()
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
+
 	t := task.NewTask(s.jobReturnsPanic)
-	sendTask := false
+	s.worker.SendTask(t)
 
 	for {
 		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				s.worker.SendTask(t)
-				sendTask = true
-			}
-
 		case <-s.done:
 			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusFail)
 			return
 		}
 	}
+
+	assert.Equal(s.T(), t.GetStatus(), task.TaskStatusFail)
 }
 
 func (s *WorkerSuite) Test_WithTaskWithTimeoutAndReturnsPanic_SetTaskStatusIsFail() {
 	go s.worker.Run()
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
+
 	t := task.NewTask(s.jobReturnsPanic)
 	t.SetTimeout(time.Second * 10)
-	sendTask := false
+	s.worker.SendTask(t)
 
 	for {
 		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				s.worker.SendTask(t)
-				sendTask = true
-			}
-
 		case <-s.done:
 			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusFail)
 			return
@@ -222,23 +216,18 @@ func (s *WorkerSuite) Test_WithTaskWithTimeoutAndReturnsPanic_SetTaskStatusIsFai
 
 func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsKillIfWorkerKill() {
 	go s.worker.Run()
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
+
 	t := task.NewTask(s.jobSleepSixSeconds)
-	sendTask := false
-	sendKillSignal := false
+	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
+
+	s.worker.Kill()
 
 	for {
 		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				s.worker.SendTask(t)
-				sendTask = true
-				continue
-			}
-
-			if !sendKillSignal {
-				s.worker.Kill()
-			}
-
 		case <-s.done:
 			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusKill)
 			return
@@ -248,24 +237,19 @@ func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsKillIfWorkerKill() {
 
 func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsKillIfWorkerKill() {
 	go s.worker.Run()
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
+
 	t := task.NewTask(s.jobSleepSixSeconds)
 	t.SetTimeout(time.Second * 10)
-	sendTask := false
-	sendKillSignal := false
+	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
+
+	s.worker.Kill()
 
 	for {
 		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				s.worker.SendTask(t)
-				sendTask = true
-				continue
-			}
-
-			if !sendKillSignal {
-				s.worker.Kill()
-			}
-
 		case <-s.done:
 			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusKill)
 			return
@@ -275,18 +259,17 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsKillIfWorkerKill()
 
 func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsFailTimeout() {
 	go s.worker.Run()
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
+
 	t := task.NewTask(s.jobSleepSixSeconds)
 	t.SetTimeout(time.Second)
-	sendTask := false
+	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
 
 	for {
 		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				s.worker.SendTask(t)
-				sendTask = true
-			}
-
 		case <-s.done:
 			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusFailByTimeout)
 			return
@@ -296,17 +279,16 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsFailTimeout() {
 
 func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsSuccess() {
 	go s.worker.Run()
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
+
 	t := task.NewTask(s.job)
-	sendTask := false
+	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
 
 	for {
 		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				s.worker.SendTask(t)
-				sendTask = true
-			}
-
 		case <-s.done:
 			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusSuccess)
 			return
@@ -316,18 +298,16 @@ func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsSuccess() {
 
 func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
 	go s.worker.Run()
+	for s.worker.GetStatus() != WorkerStatusProcess {
+	}
+
 	t := task.NewTask(s.jobSleepSixSeconds)
-	t.SetTimeout(time.Second * 10)
-	sendTask := false
+	s.worker.SendTask(t)
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
 
 	for {
 		select {
-		case <-time.After(time.Second):
-			if !sendTask {
-				s.worker.SendTask(t)
-				sendTask = true
-			}
-
 		case <-s.done:
 			assert.Equal(s.T(), t.GetStatus(), task.TaskStatusSuccess)
 			return

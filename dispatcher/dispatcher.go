@@ -150,14 +150,21 @@ func (d *Dispatcher) AddTask(t task.Tasker) {
 		return
 	}
 
-	time.AfterFunc(t.GetDuration(), func() {
+	add := func() {
 		if d.GetStatus() == DispatcherStatusProcess {
 			d.tasks.Push(t)
 			d.newQueue <- t
 		} else {
 			d.waitTasks.Push(t)
 		}
-	})
+	}
+
+	duration := t.GetDuration()
+	if duration > 0 {
+		time.AfterFunc(duration, add)
+	} else {
+		add()
+	}
 }
 
 func (d *Dispatcher) AddNamedTaskByFunc(n string, f task.TaskFunction, a ...interface{}) task.Tasker {
