@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"container/heap"
+	"errors"
 	"reflect"
 	"runtime"
 	"sync"
@@ -12,13 +13,20 @@ import (
 	"github.com/kihamo/go-workers/worker"
 )
 
+const (
+	DispatcherStatusWait = int64(iota)
+	DispatcherStatusProcess
+)
+
 type Dispatcher struct {
 	mutex     sync.RWMutex
 	waitGroup *sync.WaitGroup
 
-	workers *collection.Workers
-	tasks   *collection.Tasks
+	workers   *collection.Workers
+	tasks     *collection.Tasks
+	waitTasks *collection.Tasks
 
+	status      int64
 	workersBusy int
 
 	newQueue     chan task.Tasker // очередь новых заданий
@@ -33,9 +41,11 @@ func NewDispatcher() *Dispatcher {
 	return &Dispatcher{
 		waitGroup: new(sync.WaitGroup),
 
-		workers: collection.NewWorkers(),
-		tasks:   collection.NewTasks(),
+		workers:   collection.NewWorkers(),
+		tasks:     collection.NewTasks(),
+		waitTasks: collection.NewTasks(),
 
+		status:      DispatcherStatusWait,
 		workersBusy: 0,
 
 		newQueue:     make(chan task.Tasker),
@@ -47,7 +57,17 @@ func NewDispatcher() *Dispatcher {
 	}
 }
 
-func (d *Dispatcher) Run() {
+func (d *Dispatcher) Run() error {
+	if d.GetStatus() == DispatcherStatusProcess {
+		return errors.New("Dispatcher is running")
+	}
+
+	d.status = DispatcherStatusProcess
+
+	defer func() {
+		d.status = DispatcherStatusWait
+	}()
+
 	// отслеживание квоты на занятость исполнителей
 	go func() {
 		for {
@@ -56,6 +76,10 @@ func (d *Dispatcher) Run() {
 			<-d.allowProcessing
 		}
 	}()
+
+	for d.waitTasks.Len() > 0 {
+		d.AddTask(d.waitTasks.Pop().(task.Tasker))
+	}
 
 	heap.Init(d.workers)
 
@@ -96,7 +120,7 @@ func (d *Dispatcher) Run() {
 
 		case <-d.quit:
 			d.waitGroup.Wait()
-			return
+			return nil
 		}
 	}
 }
@@ -121,9 +145,18 @@ func (d *Dispatcher) GetWorkers() *collection.Workers {
 }
 
 func (d *Dispatcher) AddTask(t task.Tasker) {
+	if d.GetStatus() != DispatcherStatusProcess {
+		d.waitTasks.Push(t)
+		return
+	}
+
 	time.AfterFunc(t.GetDuration(), func() {
-		d.tasks.Push(t)
-		d.newQueue <- t
+		if d.GetStatus() == DispatcherStatusProcess {
+			d.tasks.Push(t)
+			d.newQueue <- t
+		} else {
+			d.waitTasks.Push(t)
+		}
 	})
 }
 
@@ -144,6 +177,19 @@ func (d *Dispatcher) GetTasks() *collection.Tasks {
 	return d.tasks
 }
 
-func (d *Dispatcher) Kill() {
-	d.quit <- true
+func (d *Dispatcher) GetWaitTasks() *collection.Tasks {
+	return d.waitTasks
+}
+
+func (d *Dispatcher) Kill() error {
+	if d.GetStatus() == DispatcherStatusProcess {
+		d.quit <- true
+		return nil
+	}
+
+	return errors.New("Dispatcher isn't running")
+}
+
+func (d *Dispatcher) GetStatus() int64 {
+	return d.status
 }

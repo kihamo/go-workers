@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -16,8 +17,8 @@ const (
 )
 
 type Worker interface {
-	Run()
-	Kill()
+	Run() error
+	Kill() error
 	Reset()
 	SendTask(task.Tasker)
 	GetTask() task.Tasker
@@ -54,7 +55,11 @@ func NewWorker(d chan Worker) *Workman {
 	}
 }
 
-func (m *Workman) Run() {
+func (m *Workman) Run() error {
+	if m.GetStatus() != WorkerStatusWait {
+		return errors.New("Worker is running")
+	}
+
 	defer func() {
 		m.setStatus(WorkerStatusWait)
 		m.done <- m
@@ -77,7 +82,7 @@ func (m *Workman) Run() {
 			}
 
 			m.wg.Wait()
-			return
+			return nil
 		}
 	}
 }
@@ -172,8 +177,13 @@ func (m *Workman) executeTask() {
 	}
 }
 
-func (m *Workman) Kill() {
-	m.kill <- true
+func (m *Workman) Kill() error {
+	if m.GetStatus() != WorkerStatusWait {
+		m.kill <- true
+		return nil
+	}
+
+	return errors.New("Worker isn't running")
 }
 
 func (m *Workman) Reset() {

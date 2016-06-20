@@ -58,7 +58,7 @@ func (h *Heap) Pop() interface{} {
 	n := len(h.items)
 
 	item := h.items[n-1]
-	h.positions[item.GetId()] = -1
+	delete(h.positions, item.GetId())
 
 	h.items = h.items[0 : n-1]
 
