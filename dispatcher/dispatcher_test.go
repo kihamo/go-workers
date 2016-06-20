@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kihamo/go-workers/worker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -52,7 +53,7 @@ func (s *DispatcherSuite) Test_TwiceRun_ReturnErrorForSecondRun() {
 	assert.Equal(s.T(), err, errors.New("Dispatcher is running"))
 }
 
-func (s *DispatcherSuite) Test_NewInstance_ReturnsStatusWait() {
+func (s *DispatcherSuite) Test_CreateNewInstance_ReturnsStatusWait() {
 	assert.Equal(s.T(), s.dispatcher.GetStatus(), DispatcherStatusWait)
 }
 
@@ -75,7 +76,7 @@ func (s *DispatcherSuite) Test_IsRunningAndKill_ReturnEmptyError() {
 	assert.Nil(s.T(), err)
 }
 
-func (s *DispatcherSuite) Test_NewInstanceAndKill_ReturnError() {
+func (s *DispatcherSuite) Test_CreateNewInstanceAndKill_ReturnError() {
 	err := s.dispatcher.Kill()
 
 	assert.Equal(s.T(), err, errors.New("Dispatcher isn't running"))
@@ -108,7 +109,7 @@ func (s *DispatcherSuite) Test_Kill_ReturnsStatusWait() {
 	s.dispatcher.Kill()
 }
 
-func (s *DispatcherSuite) Test_NewInstance_ReturnsZeroSizeOfWorkersList() {
+func (s *DispatcherSuite) Test_CreateNewInstance_ReturnsZeroSizeOfWorkersList() {
 	assert.Equal(s.T(), s.dispatcher.GetWorkers().Len(), 0)
 }
 
@@ -119,14 +120,24 @@ func (s *DispatcherSuite) Test_AddOneWorker_ReturnsOneSizeOfWorkersList() {
 	s.dispatcher.Kill()
 }
 
-func (s *DispatcherSuite) Test_NewInstance_ReturnsZeroSizeOfTasksList() {
+func (s *DispatcherSuite) Test_CreateNewInstance_ReturnsZeroSizeOfTasksList() {
 	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 0)
 }
 
-func (s *DispatcherSuite) Test_NewInstanceAndAddTask_ReturnZeroSizeOfTasksList() {
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTask_ReturnZeroSizeOfTasksList() {
 	s.dispatcher.AddTaskByFunc(s.jobSleepSixSeconds)
 
 	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 0)
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskAndRun_ReturnsOneSizeOfTasksList() {
+	w := s.dispatcher.AddWorker()
+	s.dispatcher.AddTaskByFunc(s.jobSleepSixSeconds)
+	go s.dispatcher.Run()
+	for w.GetStatus() != worker.WorkerStatusBusy {
+	}
+
+	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 1)
 }
 
 func (s *DispatcherSuite) Test_IsRunningAndAddTask_ReturnOneSizeOfTasksList() {
@@ -140,12 +151,22 @@ func (s *DispatcherSuite) Test_IsRunningAndAddTask_ReturnOneSizeOfTasksList() {
 	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 1)
 }
 
-func (s *DispatcherSuite) Test_NewInstance_ReturnsZeroSizeOfWaitTasksList() {
+func (s *DispatcherSuite) Test_CreateNewInstance_ReturnsZeroSizeOfWaitTasksList() {
 	assert.Equal(s.T(), s.dispatcher.GetWaitTasks().Len(), 0)
 }
 
-func (s *DispatcherSuite) Test_NewInstanceAndAddTask_ReturnsOneSizeOfWaitTasksList() {
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTask_ReturnsOneSizeOfWaitTasksList() {
 	s.dispatcher.AddTaskByFunc(s.jobSleepSixSeconds)
 
 	assert.Equal(s.T(), s.dispatcher.GetWaitTasks().Len(), 1)
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskAndRun_ReturnsZeroSizeOfWaitTasksList() {
+	w := s.dispatcher.AddWorker()
+	s.dispatcher.AddTaskByFunc(s.jobSleepSixSeconds)
+	go s.dispatcher.Run()
+	for w.GetStatus() != worker.WorkerStatusBusy {
+	}
+
+	assert.Equal(s.T(), s.dispatcher.GetWaitTasks().Len(), 0)
 }

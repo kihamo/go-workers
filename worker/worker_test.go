@@ -49,7 +49,7 @@ func (s *WorkerSuite) jobReturnsPanic(attempts int64, quit chan bool, args ...in
 	panic("Panic!!!")
 }
 
-func (s *WorkerSuite) Test_NewInstance_ReturnsStatusIsWait() {
+func (s *WorkerSuite) Test_CreateNewInstance_ReturnsStatusIsWait() {
 	assert.Equal(s.T(), s.worker.GetStatus(), WorkerStatusWait)
 }
 
@@ -143,7 +143,7 @@ func (s *WorkerSuite) Test_IsRunningAndKill_ReturnEmptyError() {
 	assert.Nil(s.T(), err)
 }
 
-func (s *WorkerSuite) Test_NewInstanceAndKill_ReturnError() {
+func (s *WorkerSuite) Test_CreateNewInstanceAndKill_ReturnError() {
 	err := s.worker.Kill()
 
 	assert.Equal(s.T(), err, errors.New("Worker isn't running"))
