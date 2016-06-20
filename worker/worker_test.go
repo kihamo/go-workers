@@ -271,6 +271,7 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
 	}
 
 	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetTimeout(time.Second * 10)
 	s.worker.SendTask(t)
 	for s.worker.GetStatus() != WorkerStatusWait {
 	}
