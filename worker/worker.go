@@ -42,7 +42,7 @@ type Workman struct {
 	killTask chan bool
 }
 
-func NewWorker(d chan Worker) *Workman {
+func NewWorkman(d chan Worker) *Workman {
 	return &Workman{
 		id:        uuid.New(),
 		status:    WorkerStatusWait,

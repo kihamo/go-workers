@@ -16,6 +16,10 @@ type Heap struct {
 	positions map[string]int
 }
 
+func NewHeap() *Heap {
+	return &Heap{}
+}
+
 func (h *Heap) Len() int {
 	h.mutex.RLock()
 	defer h.mutex.RUnlock()

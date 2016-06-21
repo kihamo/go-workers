@@ -25,7 +25,7 @@ func (s *WorkerSuite) SetupTest() {
 	workers.Clock = fakeclock.NewFakeClock(s.clock)
 
 	s.done = make(chan Worker)
-	s.worker = NewWorker(s.done)
+	s.worker = NewWorkman(s.done)
 }
 
 func (s *WorkerSuite) TearDownTest() {

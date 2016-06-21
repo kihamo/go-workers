@@ -126,7 +126,7 @@ func (d *Dispatcher) Run() error {
 }
 
 func (d *Dispatcher) AddWorker() worker.Worker {
-	w := worker.NewWorker(d.done)
+	w := worker.NewWorkman(d.done)
 	heap.Push(d.workers, w)
 
 	return w
