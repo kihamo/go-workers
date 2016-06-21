@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kihamo/go-workers/task"
 	"github.com/kihamo/go-workers/worker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -149,6 +150,47 @@ func (s *DispatcherSuite) Test_IsRunningAndAddTask_ReturnOneSizeOfTasksList() {
 	s.dispatcher.AddTaskByFunc(s.jobSleepSixSeconds)
 
 	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 1)
+}
+
+func (s *DispatcherSuite) Test_IsRunningAndAddTaskWithDuration_ReturnsZeroSizeOfTasksListBeforeExpirationDuration() {
+	go s.dispatcher.Run()
+	for s.dispatcher.GetStatus() != DispatcherStatusProcess {
+	}
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetDuration(time.Second * 2)
+	s.dispatcher.AddTask(t)
+
+	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 0)
+}
+
+func (s *DispatcherSuite) Test_IsRunningAndAddTaskWithDuration_ReturnsOneSizeOfTasksListAfterExpirationDuration() {
+	go s.dispatcher.Run()
+	for s.dispatcher.GetStatus() != DispatcherStatusProcess {
+	}
+
+	w := s.dispatcher.AddWorker()
+	for w.GetStatus() != worker.WorkerStatusWait {
+	}
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetDuration(time.Second * 2)
+	s.dispatcher.AddTask(t)
+
+	second := 0
+	for {
+		select {
+		case <-time.After(time.Second):
+			second += 1
+
+			if second == 2 {
+				assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 1)
+				return
+			} else {
+				assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 0)
+			}
+		}
+	}
 }
 
 func (s *DispatcherSuite) Test_CreateNewInstance_ReturnsZeroSizeOfWaitTasksList() {
