@@ -148,6 +148,20 @@ func (s *TaskSuite) Test_SetFinishedAt_GetFinishedAtReturnsTime() {
 	assert.Equal(s.T(), *t.GetFinishedAt(), s.clockTime)
 }
 
+func (s *TaskSuite) Test_NewInstance_GetStartedAtReturnsNil() {
+	t := NewTask(s.job)
+
+	assert.Nil(s.T(), t.GetStartedAt())
+}
+
+func (s *TaskSuite) Test_SetFinishedAt_GetStartedAtReturnsTime() {
+	t := NewTask(s.job)
+
+	t.SetStartedAt(s.clockTime)
+
+	assert.Equal(s.T(), *t.GetStartedAt(), s.clockTime)
+}
+
 func (s *TaskSuite) Test_NewInstance_GetTimeoutReturnsZero() {
 	t := NewTask(s.job)
 

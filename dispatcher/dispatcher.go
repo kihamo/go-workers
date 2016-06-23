@@ -3,7 +3,9 @@ package dispatcher
 import (
 	"container/heap"
 	"errors"
+	"fmt"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sync"
 
@@ -17,6 +19,12 @@ const (
 	DispatcherStatusWait = int64(iota)
 	DispatcherStatusProcess
 )
+
+var funcNameRegexp *regexp.Regexp
+
+func init() {
+	funcNameRegexp = regexp.MustCompile("^([^/]*[^.]*)?.*?\\..*?([^.)]+)(?:\\)-fm)?$")
+}
 
 type Dispatcher struct {
 	mutex     sync.RWMutex
@@ -176,7 +184,14 @@ func (d *Dispatcher) AddNamedTaskByFunc(n string, f task.TaskFunction, a ...inte
 }
 
 func (d *Dispatcher) AddTaskByFunc(f task.TaskFunction, a ...interface{}) task.Tasker {
-	return d.AddNamedTaskByFunc(runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name(), f, a...)
+	name := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
+
+	parts := funcNameRegexp.FindStringSubmatch(name)
+	if len(parts) > 0 {
+		name = fmt.Sprintf("%s.%s", parts[1], parts[2])
+	}
+
+	return d.AddNamedTaskByFunc(name, f, a...)
 }
 
 func (d *Dispatcher) GetTasks() *collection.Tasks {

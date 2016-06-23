@@ -22,6 +22,19 @@ type DispatcherSuite struct {
 	dispatcher *Dispatcher
 }
 
+var (
+	jobFuncInNonExportVariable = func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+		return 1, time.Second
+	}
+	jobFuncInExportVariable = func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+		return 1, time.Second
+	}
+)
+
+func jobFunc(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+	return 1, time.Second
+}
+
 func TestDispatcherSuite(t *testing.T) {
 	suite.Run(t, new(DispatcherSuite))
 }
@@ -215,4 +228,54 @@ func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskAndRun_ReturnsZeroSize
 	}
 
 	assert.Equal(s.T(), s.dispatcher.GetWaitTasks().Len(), 0)
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByInnerFunc_ReturnsTask() {
+	t := s.dispatcher.AddTaskByFunc(s.jobSleepSixSeconds)
+
+	assert.IsType(s.T(), &task.Task{}, t)
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByInnerFunc_ReturnsTaskWithAutoGenerateName() {
+	t := s.dispatcher.AddTaskByFunc(s.jobSleepSixSeconds)
+
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.jobSleepSixSeconds", t.GetName())
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByFunc_ReturnsTaskWithAutoGenerateName() {
+	t := s.dispatcher.AddTaskByFunc(jobFunc)
+
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.jobFunc", t.GetName())
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFunc_ReturnsTaskWithAutoGenerateName() {
+	t := s.dispatcher.AddTaskByFunc(func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+		return 1, time.Second
+	})
+
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func1", t.GetName())
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFuncFromNonExportVariable_ReturnsTaskWithAutoGenerateName() {
+	t := s.dispatcher.AddTaskByFunc(jobFuncInNonExportVariable)
+
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func1", t.GetName())
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFuncFromExportVariable_ReturnsTaskWithAutoGenerateName() {
+	t := s.dispatcher.AddTaskByFunc(jobFuncInExportVariable)
+
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func2", t.GetName())
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddNamedTaskByInnerFunc_ReturnsTask() {
+	t := s.dispatcher.AddNamedTaskByFunc("task.test", s.jobSleepSixSeconds)
+
+	assert.IsType(s.T(), &task.Task{}, t)
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddNameTaskByInnerFunc_ReturnsTaskWithAutoGenerateName() {
+	t := s.dispatcher.AddNamedTaskByFunc("task.test", s.jobSleepSixSeconds)
+
+	assert.Equal(s.T(), "task.test", t.GetName())
 }
