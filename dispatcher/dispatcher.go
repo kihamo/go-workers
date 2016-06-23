@@ -23,7 +23,7 @@ const (
 var funcNameRegexp *regexp.Regexp
 
 func init() {
-	funcNameRegexp = regexp.MustCompile("^([^/]*[^.]*)?.*?\\..*?([^.)]+)(?:\\)-fm)?$")
+	funcNameRegexp = regexp.MustCompile("^([^/]*[^.]*)?.*?\\..*?([^.)]+?)(?:(\\)[-·]fm)|[·].*)?$")
 }
 
 type Dispatcher struct {
@@ -70,10 +70,10 @@ func (d *Dispatcher) Run() error {
 		return errors.New("Dispatcher is running")
 	}
 
-	d.status = DispatcherStatusProcess
+	d.setStatus(DispatcherStatusProcess)
 
 	defer func() {
-		d.status = DispatcherStatusWait
+		d.setStatus(DispatcherStatusWait)
 	}()
 
 	// отслеживание квоты на занятость исполнителей
@@ -212,5 +212,15 @@ func (d *Dispatcher) Kill() error {
 }
 
 func (d *Dispatcher) GetStatus() int64 {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
 	return d.status
+}
+
+func (d *Dispatcher) setStatus(s int64) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	d.status = s
 }

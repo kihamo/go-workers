@@ -253,19 +253,19 @@ func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFunc_Return
 		return 1, time.Second
 	})
 
-	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func1", t.GetName())
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func", t.GetName())
 }
 
 func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFuncFromNonExportVariable_ReturnsTaskWithAutoGenerateName() {
 	t := s.dispatcher.AddTaskByFunc(jobFuncInNonExportVariable)
 
-	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func1", t.GetName())
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func", t.GetName())
 }
 
 func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFuncFromExportVariable_ReturnsTaskWithAutoGenerateName() {
 	t := s.dispatcher.AddTaskByFunc(jobFuncInExportVariable)
 
-	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func2", t.GetName())
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func", t.GetName())
 }
 
 func (s *DispatcherSuite) Test_CreateNewInstanceAndAddNamedTaskByInnerFunc_ReturnsTask() {
