@@ -57,6 +57,11 @@ func (s *DispatcherSuite) jobSleepSixSeconds(attempts int64, quit chan bool, arg
 	return 1, time.Second
 }
 
+func (s *DispatcherSuite) func1(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+	s.clock.Sleep(time.Second * 6)
+	return 1, time.Second
+}
+
 func (s *DispatcherSuite) Test_FirstRun_ReturnEmptyError() {
 	var err error
 
@@ -266,6 +271,12 @@ func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFuncFromExp
 	t := s.dispatcher.AddTaskByFunc(jobFuncInExportVariable)
 
 	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func", t.GetName())
+}
+
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddNameTaskByInnerFuncWithConflictName_ReturnsTaskWithAutoGenerateName() {
+	t := s.dispatcher.AddTaskByFunc(s.func1)
+
+	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func1", t.GetName())
 }
 
 func (s *DispatcherSuite) Test_CreateNewInstanceAndAddNamedTaskByInnerFunc_ReturnsTask() {
