@@ -15,12 +15,12 @@ type WorkersSuite struct {
 	collection *Workers
 }
 
-func (s *WorkersSuite) SetupTest() {
-	s.collection = NewWorkers()
-}
-
 func TestWorkersSuite(t *testing.T) {
 	suite.Run(t, new(WorkersSuite))
+}
+
+func (s *WorkersSuite) SetupTest() {
+	s.collection = NewWorkers()
 }
 
 func (s *WorkersSuite) Test_CreateNewInstance_LenReturnsZero() {

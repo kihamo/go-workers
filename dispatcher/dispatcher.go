@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
-	"time"
 
+	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/collection"
 	"github.com/kihamo/go-workers/task"
 	"github.com/kihamo/go-workers/worker"
@@ -156,7 +156,11 @@ func (d *Dispatcher) AddTask(t task.Tasker) {
 
 	duration := t.GetDuration()
 	if duration > 0 {
-		time.AfterFunc(duration, add)
+		timer := workers.Clock.NewTimer(duration)
+		go func() {
+			<-timer.C()
+			add()
+		}()
 	} else {
 		add()
 	}

@@ -5,14 +5,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/task"
 	"github.com/kihamo/go-workers/worker"
+	"github.com/pivotal-golang/clock/fakeclock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type DispatcherSuite struct {
 	suite.Suite
+
+	clock     *fakeclock.FakeClock
+	clockTime time.Time
 
 	dispatcher *Dispatcher
 }
@@ -23,6 +28,11 @@ func TestDispatcherSuite(t *testing.T) {
 
 func (s *DispatcherSuite) SetupTest() {
 	s.dispatcher = NewDispatcher()
+
+	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
+
+	workers.Clock = fakeclock.NewFakeClock(s.clockTime)
+	s.clock = fakeclock.NewFakeClock(s.clockTime)
 }
 
 func (s *DispatcherSuite) TearDownTest() {
@@ -30,7 +40,7 @@ func (s *DispatcherSuite) TearDownTest() {
 }
 
 func (s *DispatcherSuite) jobSleepSixSeconds(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-	time.Sleep(time.Second * 6)
+	s.clock.Sleep(time.Second * 6)
 	return 1, time.Second
 }
 
@@ -165,6 +175,8 @@ func (s *DispatcherSuite) Test_IsRunningAndAddTaskWithDuration_ReturnsZeroSizeOf
 }
 
 func (s *DispatcherSuite) Test_IsRunningAndAddTaskWithDuration_ReturnsOneSizeOfTasksListAfterExpirationDuration() {
+	clock := workers.Clock.(*fakeclock.FakeClock)
+
 	go s.dispatcher.Run()
 	for s.dispatcher.GetStatus() != DispatcherStatusProcess {
 	}
@@ -177,20 +189,12 @@ func (s *DispatcherSuite) Test_IsRunningAndAddTaskWithDuration_ReturnsOneSizeOfT
 	t.SetDuration(time.Second * 2)
 	s.dispatcher.AddTask(t)
 
-	second := 0
-	for {
-		select {
-		case <-time.After(time.Second):
-			second += 1
-
-			if second == 2 {
-				assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 1)
-				return
-			} else {
-				assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 0)
-			}
-		}
+	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 0)
+	clock.IncrementBySeconds(2)
+	for t.GetStatus() != task.TaskStatusProcess {
 	}
+
+	assert.Equal(s.T(), s.dispatcher.GetTasks().Len(), 1)
 }
 
 func (s *DispatcherSuite) Test_CreateNewInstance_ReturnsZeroSizeOfWaitTasksList() {

@@ -15,14 +15,22 @@ import (
 type WorkerSuite struct {
 	suite.Suite
 
-	clock  time.Time
+	clock     *fakeclock.FakeClock
+	clockTime time.Time
+
 	worker *Workman
 	done   chan Worker
 }
 
+func TestWorkerSuite(t *testing.T) {
+	suite.Run(t, new(WorkerSuite))
+}
+
 func (s *WorkerSuite) SetupTest() {
-	s.clock = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
-	workers.Clock = fakeclock.NewFakeClock(s.clock)
+	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
+
+	workers.Clock = fakeclock.NewFakeClock(s.clockTime)
+	s.clock = fakeclock.NewFakeClock(s.clockTime)
 
 	s.done = make(chan Worker)
 	s.worker = NewWorkman(s.done)
@@ -32,16 +40,12 @@ func (s *WorkerSuite) TearDownTest() {
 	s.worker.Kill()
 }
 
-func TestWorkerSuite(t *testing.T) {
-	suite.Run(t, new(WorkerSuite))
-}
-
 func (s *WorkerSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
 	return 1, time.Second
 }
 
 func (s *WorkerSuite) jobSleepSixSeconds(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-	time.Sleep(time.Second * 6)
+	s.clock.Sleep(time.Second * 6)
 	return 1, time.Second
 }
 
@@ -59,7 +63,7 @@ func (s *WorkerSuite) Test_GetId_ReturnsId() {
 }
 
 func (s *WorkerSuite) Test_GetCreateAt_ReturnsCreateAtTime() {
-	assert.Equal(s.T(), s.worker.GetCreatedAt(), s.clock)
+	assert.Equal(s.T(), s.worker.GetCreatedAt(), s.clockTime)
 	assert.IsType(s.T(), time.Time{}, s.worker.GetCreatedAt())
 }
 
@@ -246,6 +250,9 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsFailTimeout() {
 	t := task.NewTask(s.jobSleepSixSeconds)
 	t.SetTimeout(time.Second)
 	s.worker.SendTask(t)
+
+	workers.Clock.(*fakeclock.FakeClock).WaitForWatcherAndIncrement(time.Second)
+
 	for s.worker.GetStatus() != WorkerStatusWait {
 	}
 
@@ -273,7 +280,11 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
 	t := task.NewTask(s.jobSleepSixSeconds)
 	t.SetTimeout(time.Second * 10)
 	s.worker.SendTask(t)
-	for s.worker.GetStatus() != WorkerStatusWait {
+	for s.worker.GetStatus() != WorkerStatusBusy {
+	}
+
+	s.clock.WaitForWatcherAndIncrement(time.Second * 6)
+	for t.GetStatus() != task.TaskStatusSuccess {
 	}
 
 	assert.Equal(s.T(), t.GetStatus(), task.TaskStatusSuccess)

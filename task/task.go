@@ -34,10 +34,13 @@ type Tasker interface {
 	SetStatus(int64)
 	GetLastError() interface{}
 	SetLastError(interface{})
-	GetFinishedAt() *time.Time
-	SetFinishedAt(time.Time)
 	GetTimeout() time.Duration
 	SetTimeout(time.Duration)
+	GetCreatedAt() time.Time
+	GetStartedAt() *time.Time
+	SetStartedAt(time.Time)
+	GetFinishedAt() *time.Time
+	SetFinishedAt(time.Time)
 }
 
 type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration)
@@ -54,9 +57,10 @@ type Task struct {
 	attempts   int64
 	status     int64
 	lastError  interface{}
-	finishedAt *time.Time
 	timeout    time.Duration
 	createdAt  time.Time
+	startedAt  *time.Time
+	finishedAt *time.Time
 }
 
 func NewTask(f TaskFunction, a ...interface{}) *Task {
@@ -180,6 +184,29 @@ func (m *Task) SetLastError(e interface{}) {
 	defer m.mutex.Unlock()
 
 	m.lastError = e
+}
+
+func (m *Task) GetCreatedAt() time.Time {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	return m.createdAt
+}
+
+func (m *Task) GetStartedAt() *time.Time {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	// TODO: copy value
+
+	return m.startedAt
+}
+
+func (m *Task) SetStartedAt(t time.Time) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.startedAt = &t
 }
 
 func (m *Task) GetFinishedAt() *time.Time {

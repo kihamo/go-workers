@@ -90,6 +90,7 @@ func (m *Workman) Run() error {
 func (m *Workman) processTask() {
 	t := m.GetTask()
 
+	t.SetStartedAt(workers.Clock.Now())
 	t.SetLastError(nil)
 	if t.GetStatus() != task.TaskStatusRepeatWait {
 		t.SetAttempts(0)
@@ -131,7 +132,8 @@ func (m *Workman) executeTask() {
 		timeout := t.GetTimeout()
 
 		if timeout > 0 {
-			// execute witch timeout
+			timer := workers.Clock.NewTimer(timeout)
+
 			select {
 			case r := <-resultChan:
 				t.SetStatus(task.TaskStatusSuccess)
@@ -149,13 +151,12 @@ func (m *Workman) executeTask() {
 				t.SetStatus(task.TaskStatusKill)
 				return
 
-			case <-time.After(timeout):
+			case <-timer.C():
 				quitChan <- true
 				t.SetStatus(task.TaskStatusFailByTimeout)
 				return
 			}
 		} else {
-			// execute without timeout
 			select {
 			case r := <-resultChan:
 				t.SetStatus(task.TaskStatusSuccess)

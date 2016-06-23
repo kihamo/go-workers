@@ -5,16 +5,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kihamo/go-workers"
+	"github.com/pivotal-golang/clock/fakeclock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type TaskSuite struct {
 	suite.Suite
+
+	clockTime time.Time
 }
 
 func TestTaskSuite(t *testing.T) {
 	suite.Run(t, new(TaskSuite))
+}
+
+func (s *TaskSuite) SetupTest() {
+	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
+	workers.Clock = fakeclock.NewFakeClock(s.clockTime)
 }
 
 func (s *TaskSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
@@ -119,6 +128,12 @@ func (s *TaskSuite) Test_SetLastError_GetLastErrorReturnsError() {
 	assert.Equal(s.T(), t.GetLastError(), err)
 }
 
+func (s *TaskSuite) Test_NewInstance_GetCreatedAtReturnsTimeNow() {
+	t := NewTask(s.job)
+
+	assert.Equal(s.T(), t.GetCreatedAt(), s.clockTime)
+}
+
 func (s *TaskSuite) Test_NewInstance_GetFinishedAtReturnsNil() {
 	t := NewTask(s.job)
 
@@ -127,11 +142,10 @@ func (s *TaskSuite) Test_NewInstance_GetFinishedAtReturnsNil() {
 
 func (s *TaskSuite) Test_SetFinishedAt_GetFinishedAtReturnsTime() {
 	t := NewTask(s.job)
-	time := time.Now()
 
-	t.SetFinishedAt(time)
+	t.SetFinishedAt(s.clockTime)
 
-	assert.Equal(s.T(), *t.GetFinishedAt(), time)
+	assert.Equal(s.T(), *t.GetFinishedAt(), s.clockTime)
 }
 
 func (s *TaskSuite) Test_NewInstance_GetTimeoutReturnsZero() {
