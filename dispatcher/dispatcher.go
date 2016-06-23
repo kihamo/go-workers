@@ -3,7 +3,6 @@ package dispatcher
 import (
 	"container/heap"
 	"errors"
-	"fmt"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -203,8 +202,6 @@ func (d *Dispatcher) AddTaskByFunc(f task.TaskFunction, a ...interface{}) task.T
 
 	parts := funcNameRegexp.FindAllStringSubmatch(name, -1)
 	if len(parts) > 0 {
-		fmt.Println(parts)
-
 		for i, value := range parts[0] {
 			switch funcNameSubexpNames[i] {
 			case "name":
