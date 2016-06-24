@@ -212,7 +212,9 @@ func (s *DispatcherSuite) Test_IsRunningAndAddTaskWithDuration_ReturnsZeroSizeOf
 	d.AddTask(t)
 
 	assert.Equal(s.T(), d.GetTasks().Len(), 0)
+
 	d.Kill()
+	d.GetClock().(*fakeclock.FakeClock).WaitForWatcherAndIncrement(time.Second * 2)
 }
 
 func (s *DispatcherSuite) Test_IsRunningAndAddTaskWithDuration_ReturnsOneSizeOfTasksListAfterExpirationDuration() {
