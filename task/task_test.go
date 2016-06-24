@@ -30,6 +30,15 @@ func (s *TaskSuite) job(attempts int64, quit chan bool, args ...interface{}) (in
 	return 1, time.Second
 }
 
+func (s *TaskSuite) Test_NewInstance_GetFunctionReturnsJobFunction() {
+	var j TaskFunction
+
+	j = s.job
+	t := NewTask(j, 1, 2)
+
+	assert.IsType(s.T(), t.GetFunction(), j)
+}
+
 func (s *TaskSuite) Test_NewInstance_GetArgumentsReturnsArguments() {
 	t := NewTask(s.job, 1, 2)
 

@@ -332,3 +332,75 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
 
 	w.Kill()
 }
+
+func (s *WorkerSuite) Test_IsRunningAndAddTask_SetNowForTaskStartedAtAfterTaskProcess() {
+	w := NewWorkman(make(chan Worker))
+	go w.Run()
+	for w.GetStatus() != WorkerStatusProcess {
+	}
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	w.SendTask(t)
+	for t.GetStatus() != task.TaskStatusProcess {
+	}
+
+	assert.Equal(s.T(), t.GetStartedAt().String(), workers.Clock.Now().String())
+}
+
+func (s *WorkerSuite) Test_IsRunningAndAddTask_NotSetStartedAtBeforeTaskProcess() {
+	w := NewWorkman(make(chan Worker))
+	go w.Run()
+	for w.GetStatus() != WorkerStatusProcess {
+	}
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	w.SendTask(t)
+
+	assert.Nil(s.T(), t.GetStartedAt())
+}
+
+func (s *WorkerSuite) Test_IsRunningAndAddTaskWithNotEmptyLastError_SetNilLastError() {
+	w := NewWorkman(make(chan Worker))
+	go w.Run()
+	for w.GetStatus() != WorkerStatusProcess {
+	}
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetLastError(errors.New("Panic"))
+	w.SendTask(t)
+	for t.GetStatus() != task.TaskStatusProcess {
+	}
+
+	assert.Nil(s.T(), t.GetLastError())
+}
+
+func (s *WorkerSuite) Test_IsRunningAndAddTaskWithTwoAttempts_SetOneAttempts() {
+	w := NewWorkman(make(chan Worker))
+	go w.Run()
+	for w.GetStatus() != WorkerStatusProcess {
+	}
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetAttempts(2)
+	w.SendTask(t)
+	for t.GetStatus() != task.TaskStatusProcess {
+	}
+
+	assert.Equal(s.T(), t.GetAttempts(), int64(1))
+}
+
+func (s *WorkerSuite) Test_IsRunningAndAddTaskWithWaitStatusAndTwoAttempts_SetThreeAttempts() {
+	w := NewWorkman(make(chan Worker))
+	go w.Run()
+	for w.GetStatus() != WorkerStatusProcess {
+	}
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	t.SetAttempts(2)
+	t.SetStatus(task.TaskStatusRepeatWait)
+	w.SendTask(t)
+	for t.GetStatus() != task.TaskStatusProcess {
+	}
+
+	assert.Equal(s.T(), t.GetAttempts(), int64(3))
+}
