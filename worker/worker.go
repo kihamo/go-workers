@@ -136,17 +136,23 @@ func (m *Workman) executeTask() {
 
 			select {
 			case r := <-resultChan:
+				timer.Stop()
+
 				t.SetStatus(task.TaskStatusSuccess)
 				t.SetRepeats(r[0].(int64))
 				t.SetDuration(r[1].(time.Duration))
 				return
 
 			case err := <-errorChan:
+				timer.Stop()
+
 				t.SetStatus(task.TaskStatusFail)
 				t.SetLastError(err)
 				return
 
 			case <-m.killTask:
+				timer.Stop()
+
 				quitChan <- true
 				t.SetStatus(task.TaskStatusKill)
 				return
