@@ -24,26 +24,17 @@ func (s *WorkerSuite) SetupSuite() {
 	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
 }
 
-func (s *WorkerSuite) getWorker() Worker {
-	return NewWorkmanWithClock(make(chan Worker), fakeclock.NewFakeClock(s.clockTime))
-}
+func (s *WorkerSuite) getTaskWithSleepJob() task.Tasker {
+	c := fakeclock.NewFakeClock(s.clockTime)
 
-func (s *WorkerSuite) getTask(fn func() (*fakeclock.FakeClock, task.TaskFunction)) task.Tasker {
-	c, f := fn()
-	return task.NewTaskWithClock(c, f)
+	return task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+		c.Sleep(time.Second * 6)
+		return 1, time.Second
+	})
 }
 
 func (s *WorkerSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
 	return 1, time.Second
-}
-
-func (s *WorkerSuite) jobSleepSixSeconds() (*fakeclock.FakeClock, task.TaskFunction) {
-	clock := fakeclock.NewFakeClock(s.clockTime)
-
-	return clock, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-		clock.Sleep(time.Second * 6)
-		return 1, time.Second
-	}
 }
 
 func (s *WorkerSuite) jobReturnsPanic(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
@@ -51,27 +42,27 @@ func (s *WorkerSuite) jobReturnsPanic(attempts int64, quit chan bool, args ...in
 }
 
 func (s *WorkerSuite) Test_CreateNewInstance_ReturnsStatusIsWait() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 
 	assert.Equal(s.T(), w.GetStatus(), WorkerStatusWait)
 }
 
 func (s *WorkerSuite) Test_GetId_ReturnsId() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 
 	assert.IsType(s.T(), "", w.GetId())
 	assert.NotEmpty(s.T(), w.GetId())
 }
 
 func (s *WorkerSuite) Test_GetCreateAt_ReturnsCreateAtTime() {
-	w := s.getWorker()
+	w := NewWorkmanWithClock(make(chan Worker), fakeclock.NewFakeClock(s.clockTime))
 
 	assert.Equal(s.T(), w.GetCreatedAt(), s.clockTime)
 	assert.IsType(s.T(), time.Time{}, w.GetCreatedAt())
 }
 
 func (s *WorkerSuite) Test_SetTask_Success() {
-	w := s.getWorker().(*Workman)
+	w := NewWorkman(make(chan Worker))
 
 	t := task.NewTask(s.job)
 	w.setTask(t)
@@ -82,7 +73,7 @@ func (s *WorkerSuite) Test_SetTask_Success() {
 func (s *WorkerSuite) Test_FirstRun_ReturnEmptyError() {
 	var err error
 
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 
 	go func() {
 		err = w.Run()
@@ -95,7 +86,7 @@ func (s *WorkerSuite) Test_FirstRun_ReturnEmptyError() {
 }
 
 func (s *WorkerSuite) Test_TwiceRun_ReturnErrorForSecondRun() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -107,13 +98,13 @@ func (s *WorkerSuite) Test_TwiceRun_ReturnErrorForSecondRun() {
 }
 
 func (s *WorkerSuite) Test_IsNotRunning_ReturnStatusIsWait() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 
 	assert.Equal(s.T(), w.GetStatus(), WorkerStatusWait)
 }
 
 func (s *WorkerSuite) Test_IsRunning_ReturnStatusIsProcess() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -123,8 +114,8 @@ func (s *WorkerSuite) Test_IsRunning_ReturnStatusIsProcess() {
 }
 
 func (s *WorkerSuite) Test_IsRunningAndSendTask_ReturnStatusIsBusy() {
-	w := s.getWorker()
-	t := s.getTask(s.jobSleepSixSeconds)
+	w := NewWorkman(make(chan Worker))
+	t := s.getTaskWithSleepJob()
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -138,7 +129,7 @@ func (s *WorkerSuite) Test_IsRunningAndSendTask_ReturnStatusIsBusy() {
 }
 
 func (s *WorkerSuite) Test_Reset_ReturnEmptyTask() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	t := task.NewTask(s.job)
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
@@ -156,7 +147,7 @@ func (s *WorkerSuite) Test_Reset_ReturnEmptyTask() {
 }
 
 func (s *WorkerSuite) Test_IsRunningAndKill_ReturnEmptyError() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -167,14 +158,14 @@ func (s *WorkerSuite) Test_IsRunningAndKill_ReturnEmptyError() {
 }
 
 func (s *WorkerSuite) Test_CreateNewInstanceAndKill_ReturnError() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	err := w.Kill()
 
 	assert.Equal(s.T(), err, errors.New("Worker isn't running"))
 }
 
 func (s *WorkerSuite) Test_IsRunningTwiceKill_ReturnErrorForSecondKill() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -188,8 +179,8 @@ func (s *WorkerSuite) Test_IsRunningTwiceKill_ReturnErrorForSecondKill() {
 }
 
 func (s *WorkerSuite) Test_Kill_ReturnStatusIsWait() {
-	w := s.getWorker()
-	t := s.getTask(s.jobSleepSixSeconds)
+	w := NewWorkman(make(chan Worker))
+	t := s.getTaskWithSleepJob()
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -204,7 +195,7 @@ func (s *WorkerSuite) Test_Kill_ReturnStatusIsWait() {
 }
 
 func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetTaskStatusIsFail() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -220,7 +211,7 @@ func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetTaskStatusIsFail() {
 }
 
 func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetLastErrorIsString() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -236,7 +227,7 @@ func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetLastErrorIsString() {
 }
 
 func (s *WorkerSuite) Test_WithTaskWithTimeoutAndReturnsPanic_SetTaskStatusIsFail() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -253,12 +244,12 @@ func (s *WorkerSuite) Test_WithTaskWithTimeoutAndReturnsPanic_SetTaskStatusIsFai
 }
 
 func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsKillIfWorkerKill() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	w.SendTask(t)
 	for w.GetStatus() != WorkerStatusBusy {
 	}
@@ -271,12 +262,12 @@ func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsKillIfWorkerKill() {
 }
 
 func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsKillIfWorkerKill() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	t.SetTimeout(time.Second * 10)
 	w.SendTask(t)
 	for w.GetStatus() != WorkerStatusBusy {
@@ -290,12 +281,12 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsKillIfWorkerKill()
 }
 
 func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsFailTimeout() {
-	w := s.getWorker()
+	w := NewWorkmanWithClock(make(chan Worker), fakeclock.NewFakeClock(s.clockTime))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	t.SetTimeout(time.Second)
 	w.SendTask(t)
 
@@ -310,7 +301,7 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsFailTimeout() {
 }
 
 func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsSuccess() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
@@ -326,13 +317,16 @@ func (s *WorkerSuite) Test_WithTask_SetTaskStatusIsSuccess() {
 }
 
 func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
-	w := s.getWorker()
+	w := NewWorkmanWithClock(make(chan Worker), fakeclock.NewFakeClock(s.clockTime))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	c, f := s.jobSleepSixSeconds()
-	t := task.NewTaskWithClock(c, f)
+	c := fakeclock.NewFakeClock(s.clockTime)
+	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+		c.Sleep(time.Second * 6)
+		return 1, time.Second
+	})
 	t.SetTimeout(time.Second * 10)
 	w.SendTask(t)
 	for w.GetStatus() != WorkerStatusBusy {
@@ -349,12 +343,12 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTask_SetNowForTaskStartedAtAfterTaskProcess() {
-	w := s.getWorker()
+	w := NewWorkmanWithClock(make(chan Worker), fakeclock.NewFakeClock(s.clockTime))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	w.SendTask(t)
 	for t.GetStatus() != task.TaskStatusProcess {
 	}
@@ -365,12 +359,12 @@ func (s *WorkerSuite) Test_IsRunningAndAddTask_SetNowForTaskStartedAtAfterTaskPr
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTask_NotSetStartedAtBeforeTaskProcess() {
-	w := s.getWorker()
+	w := NewWorkmanWithClock(make(chan Worker), fakeclock.NewFakeClock(s.clockTime))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	w.SendTask(t)
 
 	assert.Nil(s.T(), t.GetStartedAt())
@@ -379,12 +373,12 @@ func (s *WorkerSuite) Test_IsRunningAndAddTask_NotSetStartedAtBeforeTaskProcess(
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTaskWithNotEmptyLastError_SetNilLastError() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	t.SetLastError(errors.New("Panic"))
 	w.SendTask(t)
 	for t.GetStatus() != task.TaskStatusProcess {
@@ -396,12 +390,12 @@ func (s *WorkerSuite) Test_IsRunningAndAddTaskWithNotEmptyLastError_SetNilLastEr
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTaskWithTwoAttempts_SetOneAttempts() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	t.SetAttempts(2)
 	w.SendTask(t)
 	for t.GetStatus() != task.TaskStatusProcess {
@@ -413,12 +407,12 @@ func (s *WorkerSuite) Test_IsRunningAndAddTaskWithTwoAttempts_SetOneAttempts() {
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTaskWithWaitStatusAndTwoAttempts_SetThreeAttempts() {
-	w := s.getWorker()
+	w := NewWorkman(make(chan Worker))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
-	t := s.getTask(s.jobSleepSixSeconds)
+	t := s.getTaskWithSleepJob()
 	t.SetAttempts(2)
 	t.SetStatus(task.TaskStatusRepeatWait)
 	w.SendTask(t)
@@ -431,15 +425,18 @@ func (s *WorkerSuite) Test_IsRunningAndAddTaskWithWaitStatusAndTwoAttempts_SetTh
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTask_SetFinishedAt() {
-	w := s.getWorker()
+	w := NewWorkmanWithClock(make(chan Worker), fakeclock.NewFakeClock(s.clockTime))
 	go w.Run()
 	for w.GetStatus() != WorkerStatusProcess {
 	}
 
 	finishedAt := w.GetClock().Now().Add(time.Second * 6)
 
-	c, f := s.jobSleepSixSeconds()
-	t := task.NewTaskWithClock(c, f)
+	c := fakeclock.NewFakeClock(s.clockTime)
+	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+		c.Sleep(time.Second * 6)
+		return 1, time.Second
+	})
 	w.SendTask(t)
 	for t.GetStatus() != task.TaskStatusProcess {
 	}
