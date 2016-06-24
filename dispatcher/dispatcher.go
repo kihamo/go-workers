@@ -127,12 +127,12 @@ func (d *Dispatcher) Run() error {
 
 		// пришло уведомление, что рабочий закончил выполнение задачи
 		case w := <-d.done:
+			t := w.GetTask()
+			d.tasks.RemoveById(t.GetId())
+
 			heap.Remove(d.workers, d.workers.GetIndexById(w.GetId()))
 			heap.Push(d.workers, w)
 
-			t := w.GetTask()
-
-			d.tasks.RemoveById(t.GetId())
 			w.Reset()
 
 			repeats := t.GetRepeats()

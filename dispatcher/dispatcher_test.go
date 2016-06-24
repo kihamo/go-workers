@@ -160,16 +160,27 @@ func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTask_ReturnZeroSizeOfTasks
 	assert.Equal(s.T(), d.GetTasks().Len(), 0)
 }
 
-func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskAndRun_ReturnsOneSizeOfTasksList() {
+func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskAndRun_ReturnsZeroSizeOfTasksListAfterSuccessExecute() {
 	d := NewDispatcher()
-
 	w := d.AddWorker()
-	d.AddTaskByFunc(s.func1)
+	c := fakeclock.NewFakeClock(s.clockTime)
+	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+		c.Sleep(time.Second * 6)
+		return 1, time.Second
+	})
+
+	d.AddTask(t)
 	go d.Run()
 	for w.GetStatus() != worker.WorkerStatusBusy {
 	}
 
-	assert.Equal(s.T(), d.GetTasks().Len(), 1)
+	c.WaitForWatcherAndIncrement(time.Second * 6)
+	for d.GetTasks().Len() != 0 {
+	}
+
+	assert.Equal(s.T(), d.GetTasks().Len(), 0)
+
+	d.Kill()
 }
 
 func (s *DispatcherSuite) Test_IsRunningAndAddTask_ReturnOneSizeOfTasksList() {
