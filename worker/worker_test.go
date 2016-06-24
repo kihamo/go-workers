@@ -219,6 +219,22 @@ func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetTaskStatusIsFail() {
 	w.Kill()
 }
 
+func (s *WorkerSuite) Test_WithTaskReturnsPanic_SetLastErrorIsString() {
+	w := NewWorkman(make(chan Worker))
+	go w.Run()
+	for w.GetStatus() != WorkerStatusProcess {
+	}
+
+	t := task.NewTask(s.jobReturnsPanic)
+	w.SendTask(t)
+	for w.GetStatus() != WorkerStatusWait {
+	}
+
+	assert.Equal(s.T(), t.GetLastError(), "Panic!!!")
+
+	w.Kill()
+}
+
 func (s *WorkerSuite) Test_WithTaskWithTimeoutAndReturnsPanic_SetTaskStatusIsFail() {
 	w := NewWorkman(make(chan Worker))
 	go w.Run()
@@ -345,6 +361,8 @@ func (s *WorkerSuite) Test_IsRunningAndAddTask_SetNowForTaskStartedAtAfterTaskPr
 	}
 
 	assert.Equal(s.T(), t.GetStartedAt().String(), workers.Clock.Now().String())
+
+	w.Kill()
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTask_NotSetStartedAtBeforeTaskProcess() {
@@ -357,6 +375,8 @@ func (s *WorkerSuite) Test_IsRunningAndAddTask_NotSetStartedAtBeforeTaskProcess(
 	w.SendTask(t)
 
 	assert.Nil(s.T(), t.GetStartedAt())
+
+	w.Kill()
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTaskWithNotEmptyLastError_SetNilLastError() {
@@ -372,6 +392,8 @@ func (s *WorkerSuite) Test_IsRunningAndAddTaskWithNotEmptyLastError_SetNilLastEr
 	}
 
 	assert.Nil(s.T(), t.GetLastError())
+
+	w.Kill()
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTaskWithTwoAttempts_SetOneAttempts() {
@@ -387,6 +409,8 @@ func (s *WorkerSuite) Test_IsRunningAndAddTaskWithTwoAttempts_SetOneAttempts() {
 	}
 
 	assert.Equal(s.T(), t.GetAttempts(), int64(1))
+
+	w.Kill()
 }
 
 func (s *WorkerSuite) Test_IsRunningAndAddTaskWithWaitStatusAndTwoAttempts_SetThreeAttempts() {
@@ -403,4 +427,30 @@ func (s *WorkerSuite) Test_IsRunningAndAddTaskWithWaitStatusAndTwoAttempts_SetTh
 	}
 
 	assert.Equal(s.T(), t.GetAttempts(), int64(3))
+
+	w.Kill()
+}
+
+func (s *WorkerSuite) Test_IsRunningAndAddTask_SetFinishedAt() {
+	w := NewWorkman(make(chan Worker))
+	go w.Run()
+	for w.GetStatus() != WorkerStatusProcess {
+	}
+
+	finishedAt := workers.Clock.Now().Add(time.Second * 6)
+
+	t := task.NewTask(s.jobSleepSixSeconds)
+	w.SendTask(t)
+	for t.GetStatus() != task.TaskStatusProcess {
+	}
+
+	workers.Clock.(*fakeclock.FakeClock).IncrementBySeconds(6)
+	s.clock.WaitForWatcherAndIncrement(time.Second * 6)
+
+	for t.GetStatus() != task.TaskStatusSuccess {
+	}
+
+	assert.Equal(s.T(), t.GetFinishedAt().String(), finishedAt.String())
+
+	w.Kill()
 }

@@ -21,7 +21,7 @@ func TestTaskSuite(t *testing.T) {
 	suite.Run(t, new(TaskSuite))
 }
 
-func (s *TaskSuite) SetupTest() {
+func (s *TaskSuite) SetupSuite() {
 	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
 	workers.Clock = fakeclock.NewFakeClock(s.clockTime)
 }
