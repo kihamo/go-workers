@@ -8,10 +8,10 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/collection"
 	"github.com/kihamo/go-workers/task"
 	"github.com/kihamo/go-workers/worker"
+	"github.com/pivotal-golang/clock"
 )
 
 const (
@@ -41,8 +41,9 @@ func init() {
 }
 
 type Dispatcher struct {
-	mutex     sync.RWMutex
-	waitGroup *sync.WaitGroup
+	mutex sync.RWMutex
+	wg    *sync.WaitGroup
+	clock clock.Clock
 
 	workers   *collection.Workers
 	tasks     *collection.Tasks
@@ -60,8 +61,13 @@ type Dispatcher struct {
 }
 
 func NewDispatcher() *Dispatcher {
+	return NewDispatcherWithClock(clock.NewClock())
+}
+
+func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 	return &Dispatcher{
-		waitGroup: new(sync.WaitGroup),
+		wg:    new(sync.WaitGroup),
+		clock: c,
 
 		workers:   collection.NewWorkers(),
 		tasks:     collection.NewTasks(),
@@ -141,23 +147,23 @@ func (d *Dispatcher) Run() error {
 			}
 
 		case <-d.quit:
-			d.waitGroup.Wait()
+			d.wg.Wait()
 			return nil
 		}
 	}
 }
 
 func (d *Dispatcher) AddWorker() worker.Worker {
-	w := worker.NewWorkman(d.done)
+	w := worker.NewWorkmanWithClock(d.done, d.GetClock())
 	heap.Push(d.workers, w)
 
 	return w
 }
 
 func (d *Dispatcher) runWorker(w worker.Worker) {
-	d.waitGroup.Add(1)
+	d.wg.Add(1)
 	go func() {
-		defer d.waitGroup.Done()
+		defer d.wg.Done()
 		w.Run()
 	}()
 }
@@ -178,7 +184,7 @@ func (d *Dispatcher) AddTask(t task.Tasker) {
 
 	duration := t.GetDuration()
 	if duration > 0 {
-		timer := workers.Clock.NewTimer(duration)
+		timer := d.GetClock().NewTimer(duration)
 		go func() {
 			<-timer.C()
 			add()
@@ -246,4 +252,11 @@ func (d *Dispatcher) setStatus(s int64) {
 	defer d.mutex.Unlock()
 
 	d.status = s
+}
+
+func (d *Dispatcher) GetClock() clock.Clock {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	return d.clock
 }

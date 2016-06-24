@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/task"
 	"github.com/pborman/uuid"
+	"github.com/pivotal-golang/clock"
 )
 
 const (
@@ -25,11 +25,13 @@ type Worker interface {
 	GetId() string
 	GetStatus() int64
 	GetCreatedAt() time.Time
+	GetClock() clock.Clock
 }
 
 type Workman struct {
 	mutex sync.RWMutex
-	wg    sync.WaitGroup
+	wg    *sync.WaitGroup
+	clock clock.Clock
 
 	id        string
 	status    int64
@@ -43,10 +45,17 @@ type Workman struct {
 }
 
 func NewWorkman(d chan Worker) *Workman {
+	return NewWorkmanWithClock(d, clock.NewClock())
+}
+
+func NewWorkmanWithClock(d chan Worker, c clock.Clock) *Workman {
 	return &Workman{
+		wg:    new(sync.WaitGroup),
+		clock: c,
+
 		id:        uuid.New(),
 		status:    WorkerStatusWait,
-		createdAt: workers.Clock.Now(),
+		createdAt: c.Now(),
 		kill:      make(chan bool, 1),
 		done:      d,
 
@@ -90,7 +99,7 @@ func (m *Workman) Run() error {
 func (m *Workman) processTask() {
 	t := m.GetTask()
 
-	t.SetStartedAt(workers.Clock.Now())
+	t.SetStartedAt(m.GetClock().Now())
 	t.SetLastError(nil)
 	if t.GetStatus() != task.TaskStatusRepeatWait {
 		t.SetAttempts(0)
@@ -117,7 +126,7 @@ func (m *Workman) executeTask() {
 
 	go func() {
 		defer func() {
-			t.SetFinishedAt(workers.Clock.Now())
+			t.SetFinishedAt(m.GetClock().Now())
 
 			if err := recover(); err != nil {
 				errorChan <- err
@@ -132,7 +141,7 @@ func (m *Workman) executeTask() {
 		timeout := t.GetTimeout()
 
 		if timeout > 0 {
-			timer := workers.Clock.NewTimer(timeout)
+			timer := m.GetClock().NewTimer(timeout)
 
 			select {
 			case r := <-resultChan:
@@ -241,4 +250,11 @@ func (m *Workman) GetCreatedAt() time.Time {
 	defer m.mutex.RUnlock()
 
 	return m.createdAt
+}
+
+func (m *Workman) GetClock() clock.Clock {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	return m.clock
 }

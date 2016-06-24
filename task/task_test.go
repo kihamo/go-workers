@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kihamo/go-workers"
 	"github.com/pivotal-golang/clock/fakeclock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -23,7 +22,6 @@ func TestTaskSuite(t *testing.T) {
 
 func (s *TaskSuite) SetupSuite() {
 	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
-	workers.Clock = fakeclock.NewFakeClock(s.clockTime)
 }
 
 func (s *TaskSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
@@ -138,7 +136,7 @@ func (s *TaskSuite) Test_SetLastError_GetLastErrorReturnsError() {
 }
 
 func (s *TaskSuite) Test_NewInstance_GetCreatedAtReturnsTimeNow() {
-	t := NewTask(s.job)
+	t := NewTaskWithClock(fakeclock.NewFakeClock(s.clockTime), s.job)
 
 	assert.Equal(s.T(), t.GetCreatedAt(), s.clockTime)
 }

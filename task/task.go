@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kihamo/go-workers"
 	"github.com/pborman/uuid"
+	"github.com/pivotal-golang/clock"
 )
 
 const (
@@ -64,6 +64,10 @@ type Task struct {
 }
 
 func NewTask(f TaskFunction, a ...interface{}) *Task {
+	return NewTaskWithClock(clock.NewClock(), f, a...)
+}
+
+func NewTaskWithClock(c clock.Clock, f TaskFunction, a ...interface{}) *Task {
 	return &Task{
 		fn:        f,
 		args:      a,
@@ -73,7 +77,7 @@ func NewTask(f TaskFunction, a ...interface{}) *Task {
 		attempts:  0,
 		status:    TaskStatusWait,
 		timeout:   0,
-		createdAt: workers.Clock.Now(),
+		createdAt: c.Now(),
 	}
 }
 
