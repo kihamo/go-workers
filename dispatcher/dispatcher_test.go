@@ -51,6 +51,13 @@ func (s *DispatcherSuite) SetupTest() {
 	}
 }
 
+func (s *DispatcherSuite) TearDownTest() {
+	// reset sleep timer in jobSleepSixSeconds
+	if s.clock.WatcherCount() > 0 {
+		s.clock.WaitForWatcherAndIncrement(time.Second * 6)
+	}
+}
+
 func (s *DispatcherSuite) jobSleepSixSeconds(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
 	s.clock.Sleep(time.Second * 6)
 	return 1, time.Second
