@@ -55,7 +55,8 @@ type Dispatcher struct {
 	newQueue     chan task.Tasker // очередь новых заданий
 	executeQueue chan task.Tasker // очередь выполняемых заданий
 
-	done            chan worker.Worker // канал уведомления о завершении выполнения заданий
+	doneTask        chan task.Tasker   // канал уведомления о завершении выполнения заданий
+	doneWorker      chan worker.Worker // канал уведомления о завершении рабочего
 	quit            chan bool          // канал для завершения диспетчера
 	allowProcessing chan bool          // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
 }
@@ -79,7 +80,7 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 		newQueue:     make(chan task.Tasker),
 		executeQueue: make(chan task.Tasker),
 
-		done:            make(chan worker.Worker),
+		doneWorker:      make(chan worker.Worker),
 		quit:            make(chan bool, 1),
 		allowProcessing: make(chan bool),
 	}
@@ -126,9 +127,13 @@ func (d *Dispatcher) Run() error {
 			}
 
 		// пришло уведомление, что рабочий закончил выполнение задачи
-		case w := <-d.done:
+		case w := <-d.doneWorker:
 			t := w.GetTask()
 			d.tasks.RemoveById(t.GetId())
+
+			if d.doneTask != nil {
+				d.doneTask <- t
+			}
 
 			heap.Remove(d.workers, d.workers.GetIndexById(w.GetId()))
 			heap.Push(d.workers, w)
@@ -154,7 +159,7 @@ func (d *Dispatcher) Run() error {
 }
 
 func (d *Dispatcher) AddWorker() worker.Worker {
-	w := worker.NewWorkmanWithClock(d.done, d.GetClock())
+	w := worker.NewWorkmanWithClock(d.doneWorker, d.GetClock())
 	heap.Push(d.workers, w)
 
 	return w
@@ -259,4 +264,11 @@ func (d *Dispatcher) GetClock() clock.Clock {
 	defer d.mutex.RUnlock()
 
 	return d.clock
+}
+
+func (d *Dispatcher) SetTaskDoneChannel(c chan task.Tasker) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	d.doneTask = c
 }
