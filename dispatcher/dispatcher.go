@@ -3,9 +3,6 @@ package dispatcher
 import (
 	"container/heap"
 	"errors"
-	"reflect"
-	"regexp"
-	"runtime"
 	"sync"
 
 	"github.com/kihamo/go-workers/collection"
@@ -18,27 +15,6 @@ const (
 	DispatcherStatusWait = int64(iota)
 	DispatcherStatusProcess
 )
-
-var (
-	funcNameRegexp      *regexp.Regexp
-	funcNameSubexpNames []string
-)
-
-func init() {
-	funcNameRegexp = regexp.MustCompile("" +
-		// package
-		"^(?P<package>[^/]*[^.]*)?" +
-
-		".*?" +
-
-		// name
-		"(" +
-		"(?:glob\\.)?(?P<name>func)(?:\\d+)" + // anonymous func in go >= 1.5 dispatcher.glob.func1 or method.func1
-		"|(?P<name>func)(?:·\\d+)" + // anonymous func in go < 1.5, ex. dispatcher.func·002
-		"|(?P<name>[^.]+?)(?:\\)[-·]fm)?" + // dispatcher.jobFunc or dispatcher.jobSleepSixSeconds)·fm
-		")?$")
-	funcNameSubexpNames = funcNameRegexp.SubexpNames()
-}
 
 type Dispatcher struct {
 	mutex sync.RWMutex
@@ -201,7 +177,10 @@ func (d *Dispatcher) AddTask(t task.Tasker) {
 
 func (d *Dispatcher) AddNamedTaskByFunc(n string, f task.TaskFunction, a ...interface{}) task.Tasker {
 	task := task.NewTask(f, a...)
-	task.SetName(n)
+
+	if n != "" {
+		task.SetName(n)
+	}
 
 	d.AddTask(task)
 
@@ -209,23 +188,7 @@ func (d *Dispatcher) AddNamedTaskByFunc(n string, f task.TaskFunction, a ...inte
 }
 
 func (d *Dispatcher) AddTaskByFunc(f task.TaskFunction, a ...interface{}) task.Tasker {
-	name := runtime.FuncForPC(reflect.ValueOf(f).Pointer()).Name()
-
-	parts := funcNameRegexp.FindAllStringSubmatch(name, -1)
-	if len(parts) > 0 {
-		for i, value := range parts[0] {
-			switch funcNameSubexpNames[i] {
-			case "name":
-				if value != "" {
-					name += "." + value
-				}
-			case "package":
-				name = value
-			}
-		}
-	}
-
-	return d.AddNamedTaskByFunc(name, f, a...)
+	return d.AddNamedTaskByFunc("", f, a...)
 }
 
 func (d *Dispatcher) GetTasks() *collection.Tasks {

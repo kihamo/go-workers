@@ -50,10 +50,10 @@ func (s *TaskSuite) Test_NewInstance_GetIdReturnsId() {
 	assert.NotEmpty(s.T(), t.GetId())
 }
 
-func (s *TaskSuite) Test_NewInstance_GetNameReturnsId() {
+func (s *TaskSuite) Test_NewInstance_GetNameReturnsFuncName() {
 	t := NewTask(s.job)
 
-	assert.Equal(s.T(), t.GetName(), t.GetId())
+	assert.Equal(s.T(), t.GetName(), "github.com/kihamo/go-workers/task.job")
 }
 
 func (s *TaskSuite) Test_SetNameTestName_GetNameReturnsTestName() {

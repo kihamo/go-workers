@@ -1,6 +1,9 @@
 package task
 
 import (
+	"reflect"
+	"regexp"
+	"runtime"
 	"sync"
 	"time"
 
@@ -18,8 +21,30 @@ const (
 	TaskStatusRepeatWait
 )
 
+var (
+	funcNameRegexp      *regexp.Regexp
+	funcNameSubexpNames []string
+)
+
+func init() {
+	funcNameRegexp = regexp.MustCompile("" +
+		// package
+		"^(?P<package>[^/]*[^.]*)?" +
+
+		".*?" +
+
+		// name
+		"(" +
+		"(?:glob\\.)?(?P<name>func)(?:\\d+)" + // anonymous func in go >= 1.5 dispatcher.glob.func1 or method.func1
+		"|(?P<name>func)(?:·\\d+)" + // anonymous func in go < 1.5, ex. dispatcher.func·002
+		"|(?P<name>[^.]+?)(?:\\)[-·]fm)?" + // dispatcher.jobFunc or dispatcher.jobSleepSixSeconds)·fm
+		")?$")
+	funcNameSubexpNames = funcNameRegexp.SubexpNames()
+}
+
 type Tasker interface {
 	GetFunction() TaskFunction
+	GetFunctionName() string
 	GetArguments() []interface{}
 	GetId() string
 	GetName() string
@@ -88,6 +113,26 @@ func (m *Task) GetFunction() TaskFunction {
 	return m.fn
 }
 
+func (m *Task) GetFunctionName() string {
+	name := runtime.FuncForPC(reflect.ValueOf(m.GetFunction()).Pointer()).Name()
+
+	parts := funcNameRegexp.FindAllStringSubmatch(name, -1)
+	if len(parts) > 0 {
+		for i, value := range parts[0] {
+			switch funcNameSubexpNames[i] {
+			case "name":
+				if value != "" {
+					name += "." + value
+				}
+			case "package":
+				name = value
+			}
+		}
+	}
+
+	return name
+}
+
 func (m *Task) GetArguments() []interface{} {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -107,7 +152,7 @@ func (m *Task) GetName() string {
 	defer m.mutex.RUnlock()
 
 	if m.name == "" {
-		return m.id
+		return m.GetFunctionName()
 	}
 
 	return m.name
