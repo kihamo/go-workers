@@ -195,7 +195,7 @@ func (d *Dispatcher) AddTask(t task.Tasker) {
 }
 
 func (d *Dispatcher) AddNamedTaskByFunc(n string, f task.TaskFunction, a ...interface{}) task.Tasker {
-	task := task.NewTask(f, a)
+	task := task.NewTask(f, a...)
 	task.SetName(n)
 
 	d.AddTask(task)
