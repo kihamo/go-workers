@@ -19,16 +19,16 @@ type DispatcherSuite struct {
 }
 
 var (
-	jobFuncInNonExportVariable = func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-		return 1, time.Second
+	jobFuncInNonExportVariable = func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+		return 1, time.Second, nil
 	}
-	jobFuncInExportVariable = func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-		return 1, time.Second
+	jobFuncInExportVariable = func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+		return 1, time.Second, nil
 	}
 )
 
-func jobOuter(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-	return 1, time.Second
+func jobOuter(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	return 1, time.Second, nil
 }
 
 func TestDispatcherSuite(t *testing.T) {
@@ -39,12 +39,12 @@ func (s *DispatcherSuite) SetupSuite() {
 	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
 }
 
-func (s *DispatcherSuite) func1(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-	return 1, time.Second
+func (s *DispatcherSuite) func1(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	return 1, time.Second, nil
 }
 
-func (s *DispatcherSuite) jobInner(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-	return 1, time.Second
+func (s *DispatcherSuite) jobInner(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	return 1, time.Second, nil
 }
 
 func (s *DispatcherSuite) Test_FirstRun_ReturnEmptyError() {
@@ -164,9 +164,9 @@ func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskAndRun_ReturnsZeroSize
 	d := NewDispatcher()
 	w := d.AddWorker()
 	c := fakeclock.NewFakeClock(s.clockTime)
-	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
+	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
 		c.Sleep(time.Second * 6)
-		return 1, time.Second
+		return 1, time.Second, nil
 	})
 
 	d.AddTask(t)
@@ -280,8 +280,8 @@ func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByFunc_ReturnsTaskWith
 }
 
 func (s *DispatcherSuite) Test_CreateNewInstanceAndAddTaskByAnonymousFunc_ReturnsTaskWithAutoGenerateName() {
-	t := NewDispatcher().AddTaskByFunc(func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-		return 1, time.Second
+	t := NewDispatcher().AddTaskByFunc(func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+		return 1, time.Second, nil
 	})
 
 	assert.Equal(s.T(), "github.com/kihamo/go-workers/dispatcher.func", t.GetName())

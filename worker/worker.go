@@ -133,8 +133,8 @@ func (m *Workman) executeTask() {
 			}
 		}()
 
-		newRepeats, newDuration := t.GetFunction()(t.GetAttempts(), quitChan, t.GetArguments()...)
-		resultChan <- []interface{}{newRepeats, newDuration}
+		newRepeats, newDuration, err := t.GetFunction()(t.GetAttempts(), quitChan, t.GetArguments()...)
+		resultChan <- []interface{}{newRepeats, newDuration, err}
 	}()
 
 	for {
@@ -150,6 +150,11 @@ func (m *Workman) executeTask() {
 				t.SetStatus(task.TaskStatusSuccess)
 				t.SetRepeats(r[0].(int64))
 				t.SetDuration(r[1].(time.Duration))
+
+				if r[2] != nil {
+					t.SetLastError(r[2])
+				}
+
 				return
 
 			case err := <-errorChan:
@@ -177,6 +182,11 @@ func (m *Workman) executeTask() {
 				t.SetStatus(task.TaskStatusSuccess)
 				t.SetRepeats(r[0].(int64))
 				t.SetDuration(r[1].(time.Duration))
+
+				if r[2] != nil {
+					t.SetLastError(r[2])
+				}
+
 				return
 
 			case err := <-errorChan:

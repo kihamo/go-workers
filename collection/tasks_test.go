@@ -24,8 +24,8 @@ func TestTasksSuite(t *testing.T) {
 	suite.Run(t, new(TasksSuite))
 }
 
-func (s *TasksSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-	return 1, time.Second
+func (s *TasksSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	return 1, time.Second, nil
 }
 
 func (s *TasksSuite) Test_CreateNewInstance_LenReturnsZero() {

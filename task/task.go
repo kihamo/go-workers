@@ -68,7 +68,7 @@ type Tasker interface {
 	SetFinishedAt(time.Time)
 }
 
-type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration)
+type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration, error)
 
 type Task struct {
 	mutex sync.RWMutex

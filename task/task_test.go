@@ -24,8 +24,8 @@ func (s *TaskSuite) SetupSuite() {
 	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
 }
 
-func (s *TaskSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration) {
-	return 1, time.Second
+func (s *TaskSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	return 1, time.Second, nil
 }
 
 func (s *TaskSuite) Test_NewInstance_GetFunctionReturnsJobFunction() {
