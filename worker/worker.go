@@ -150,12 +150,14 @@ func (m *Workman) executeTask() {
 			case r := <-resultChan:
 				timer.Stop()
 
-				t.SetStatus(task.TaskStatusSuccess)
 				t.SetRepeats(r[0].(int64))
 				t.SetDuration(r[1].(time.Duration))
 
 				if r[2] != nil {
+					t.SetStatus(task.TaskStatusFail)
 					t.SetLastError(r[2])
+				} else {
+					t.SetStatus(task.TaskStatusSuccess)
 				}
 
 				return
@@ -182,12 +184,14 @@ func (m *Workman) executeTask() {
 		} else {
 			select {
 			case r := <-resultChan:
-				t.SetStatus(task.TaskStatusSuccess)
 				t.SetRepeats(r[0].(int64))
 				t.SetDuration(r[1].(time.Duration))
 
 				if r[2] != nil {
+					t.SetStatus(task.TaskStatusFail)
 					t.SetLastError(r[2])
+				} else {
+					t.SetStatus(task.TaskStatusSuccess)
 				}
 
 				return
