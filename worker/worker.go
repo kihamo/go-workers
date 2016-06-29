@@ -78,11 +78,11 @@ func (m *Workman) Run() error {
 
 	for {
 		select {
-		case task := <-m.newTask:
-			m.wg.Add(1)
+		case t := <-m.newTask:
 			m.setStatus(WorkerStatusBusy)
+			m.setTask(t)
 
-			m.setTask(task)
+			m.wg.Add(1)
 			go m.processTask()
 
 		case <-m.kill:
@@ -97,6 +97,8 @@ func (m *Workman) Run() error {
 }
 
 func (m *Workman) processTask() {
+	defer m.wg.Done()
+
 	t := m.GetTask()
 
 	t.SetStartedAt(m.GetClock().Now())
@@ -115,15 +117,12 @@ func (m *Workman) processTask() {
 }
 
 func (m *Workman) executeTask() {
-	defer func() {
-		m.wg.Done()
-	}()
-
 	t := m.GetTask()
 	resultChan := make(chan []interface{}, 1)
 	errorChan := make(chan interface{}, 1)
 	quitChan := make(chan bool, 1)
 
+	m.wg.Add(1)
 	go func() {
 		defer func() {
 			t.SetFinishedAt(m.GetClock().Now())
@@ -131,6 +130,8 @@ func (m *Workman) executeTask() {
 			if err := recover(); err != nil {
 				errorChan <- err
 			}
+
+			m.wg.Done()
 		}()
 
 		newRepeats, newDuration, err := t.GetFunction()(t.GetAttempts(), quitChan, t.GetArguments()...)
