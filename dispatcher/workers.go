@@ -110,3 +110,18 @@ func (q *Workers) HasWait() bool {
 
 	return q.wait > 0
 }
+
+func (q *Workers) GetItems() []worker.Worker {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	items := make([]worker.Worker, q.container.Len())
+	i := 0
+
+	for e := q.container.Front(); e != nil; e = e.Next() {
+		items[i] = e.Value.(worker.Worker)
+		i++
+	}
+
+	return items
+}
