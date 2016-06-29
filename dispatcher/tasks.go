@@ -93,10 +93,3 @@ func (q *Tasks) HasWait() bool {
 
 	return q.wait > 0
 }
-
-func (q *Tasks) GetWaitsCount() int {
-	q.mutex.RLock()
-	defer q.mutex.RUnlock()
-
-	return q.wait
-}

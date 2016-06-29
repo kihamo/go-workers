@@ -7,11 +7,9 @@ import (
 	"github.com/kihamo/go-workers/task"
 )
 
-func Benchmark1000Workers1000Tasks(b *testing.B) {
+func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, tasksCount int) {
 	b.StopTimer()
-
-	workersCount := 10
-	tasksCount := 10
+	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
 		done := make(chan task.Tasker, tasksCount)
@@ -55,7 +53,15 @@ func Benchmark1000Workers1000Tasks(b *testing.B) {
 			d.AddTaskByFunc(f)
 		}
 
-		<- quit
+		<-quit
 		b.StopTimer()
 	}
+}
+
+func Benchmark100Workers10Tasks(b *testing.B) {
+	runDispatcherByWorkersCountAndTasksCount(b, 100, 10)
+}
+
+func Benchmark1000Workers1000Tasks(b *testing.B) {
+	runDispatcherByWorkersCountAndTasksCount(b, 1000, 1000)
 }

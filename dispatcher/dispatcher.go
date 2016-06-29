@@ -17,7 +17,7 @@ const (
 
 type Dispatcher struct {
 	mutex sync.RWMutex
-	wg    *sync.WaitGroup
+	wg    sync.WaitGroup
 	clock clock.Clock
 
 	workers *Workers
@@ -41,7 +41,6 @@ func NewDispatcher() *Dispatcher {
 
 func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 	return &Dispatcher{
-		wg:    new(sync.WaitGroup),
 		clock: c,
 
 		workers: NewWorkers(),
@@ -132,21 +131,32 @@ func (d *Dispatcher) doAllowProcessing() {
 				t := d.GetTasks().GetWait()
 				w := d.GetWorkers().GetWait()
 
+				changeStatus := make(chan int64, 1)
+				w.SetChangeStatusChannel(changeStatus)
+
 				d.wg.Add(1)
 				go func() {
 					defer d.wg.Done()
-					w.Run()
+
+					for {
+						select {
+						case s := <-changeStatus:
+							if s == worker.WorkerStatusProcess {
+								d.addWorker(w)
+								w.SetChangeStatusChannel(nil)
+								w.SendTask(t)
+
+								return
+							}
+						}
+					}
 				}()
 
 				d.wg.Add(1)
 				go func() {
 					defer d.wg.Done()
 
-					for w.GetStatus() != worker.WorkerStatusProcess {
-					}
-
-					d.addWorker(w)
-					w.SendTask(t)
+					w.Run()
 				}()
 			}
 

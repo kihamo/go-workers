@@ -21,6 +21,7 @@ type Worker interface {
 	Kill() error
 	Reset()
 	SendTask(task.Tasker)
+	SetChangeStatusChannel(chan int64)
 	GetTask() task.Tasker
 	GetId() string
 	GetStatus() int64
@@ -30,14 +31,16 @@ type Worker interface {
 
 type Workman struct {
 	mutex sync.RWMutex
-	wg    *sync.WaitGroup
+	wg    sync.WaitGroup
 	clock clock.Clock
 
 	id        string
 	status    int64
 	createdAt time.Time
-	kill      chan bool
-	done      chan Worker
+
+	changeStatus chan int64
+	kill         chan bool
+	done         chan Worker
 
 	task     task.Tasker
 	newTask  chan task.Tasker
@@ -50,7 +53,6 @@ func NewWorkman(d chan Worker) *Workman {
 
 func NewWorkmanWithClock(d chan Worker, c clock.Clock) *Workman {
 	return &Workman{
-		wg:    new(sync.WaitGroup),
 		clock: c,
 
 		id:        uuid.New(),
@@ -235,6 +237,13 @@ func (m *Workman) SendTask(t task.Tasker) {
 	m.newTask <- t
 }
 
+func (m *Workman) SetChangeStatusChannel(c chan int64) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.changeStatus = c
+}
+
 func (m *Workman) GetId() string {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -252,6 +261,10 @@ func (m *Workman) GetStatus() int64 {
 func (m *Workman) setStatus(s int64) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	if m.changeStatus != nil && m.status != s {
+		m.changeStatus <- s
+	}
 
 	m.status = s
 }
