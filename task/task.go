@@ -57,6 +57,8 @@ type Tasker interface {
 	SetAttempts(int64)
 	GetStatus() int64
 	SetStatus(int64)
+	GetPriority() int64
+	SetPriority(int64)
 	GetLastError() interface{}
 	SetLastError(interface{})
 	GetTimeout() time.Duration
@@ -81,6 +83,7 @@ type Task struct {
 	repeats    int64
 	attempts   int64
 	status     int64
+	priority   int64
 	lastError  interface{}
 	timeout    time.Duration
 	createdAt  time.Time
@@ -101,6 +104,7 @@ func NewTaskWithClock(c clock.Clock, f TaskFunction, a ...interface{}) *Task {
 		repeats:   1,
 		attempts:  0,
 		status:    TaskStatusWait,
+		priority:  1,
 		timeout:   0,
 		createdAt: c.Now(),
 	}
@@ -219,6 +223,20 @@ func (m *Task) SetStatus(s int64) {
 	defer m.mutex.Unlock()
 
 	m.status = s
+}
+
+func (m *Task) GetPriority() int64 {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	return m.priority
+}
+
+func (m *Task) SetPriority(p int64) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.priority = p
 }
 
 func (m *Task) GetLastError() interface{} {
