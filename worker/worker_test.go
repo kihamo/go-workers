@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"code.cloudfoundry.org/clock/fakeclock"
 	"github.com/kihamo/go-workers/task"
-	"github.com/pivotal-golang/clock/fakeclock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )

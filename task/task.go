@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"code.cloudfoundry.org/clock"
 	"github.com/pborman/uuid"
-	"github.com/pivotal-golang/clock"
 )
 
 const (

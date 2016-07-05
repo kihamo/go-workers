@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"code.cloudfoundry.org/clock"
 	"github.com/kihamo/go-workers/task"
 	"github.com/kihamo/go-workers/worker"
-	"github.com/pivotal-golang/clock"
 )
 
 const (
