@@ -24,7 +24,7 @@ type Dispatcher struct {
 	tasks   *Tasks
 
 	status   int64
-	doneTask chan task.Tasker // канал уведомления о завершении выполнения заданий
+	doneTask []chan task.Tasker // каналы уведомления о завершении выполнения заданий
 
 	doneWorker       chan worker.Worker // канал уведомления о завершении рабочего
 	quitDoWorkerDone chan bool
@@ -46,7 +46,8 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 		workers: NewWorkers(),
 		tasks:   NewTasks(),
 
-		status: DispatcherStatusWait,
+		status:   DispatcherStatusWait,
+		doneTask: []chan task.Tasker{},
 
 		doneWorker:       make(chan worker.Worker),
 		quitDoWorkerDone: make(chan bool, 1),
@@ -99,11 +100,13 @@ func (d *Dispatcher) doWorkerDone() {
 			go d.notifyAllowProcessing()
 
 			d.mutex.RLock()
-			if d.doneTask != nil {
+			if len(d.doneTask) > 0 {
 				// может держать процесс заблокированным, если канал буферизированный и с малым размером
-				go func() {
-					d.doneTask <- t
-				}()
+				go func(l []chan task.Tasker) {
+					for _, c := range l {
+						c <- t
+					}
+				}(d.doneTask)
 			}
 			d.mutex.RUnlock()
 
@@ -263,5 +266,12 @@ func (d *Dispatcher) SetTaskDoneChannel(c chan task.Tasker) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	d.doneTask = c
+	d.doneTask = []chan task.Tasker{c}
+}
+
+func (d *Dispatcher) AddTaskDoneChannel(c chan task.Tasker) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	d.doneTask = append(d.doneTask, c)
 }
