@@ -101,12 +101,12 @@ func (d *Dispatcher) doWorkerDone() {
 
 			d.mutex.RLock()
 			if len(d.doneTask) > 0 {
-				// может держать процесс заблокированным, если канал буферизированный и с малым размером
-				go func(l []chan task.Tasker) {
-					for _, c := range l {
+				for _, done := range d.doneTask {
+					// может держать процесс заблокированным, если канал не буферизированный и с малым размером
+					go func(c chan task.Tasker) {
 						c <- t
-					}
-				}(d.doneTask)
+					}(done)
+				}
 			}
 			d.mutex.RUnlock()
 
