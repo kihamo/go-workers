@@ -104,6 +104,7 @@ func (m *Workman) processTask() {
 	t := m.GetTask()
 
 	t.SetStartedAt(m.GetClock().Now())
+	t.SetReturns(nil)
 	t.SetLastError(nil)
 	if t.GetStatus() != task.TaskStatusRepeatWait {
 		t.SetAttempts(0)
@@ -136,8 +137,8 @@ func (m *Workman) executeTask() {
 			m.wg.Done()
 		}()
 
-		newRepeats, newDuration, err := t.GetFunction()(t.GetAttempts(), quitChan, t.GetArguments()...)
-		resultChan <- []interface{}{newRepeats, newDuration, err}
+		newRepeats, newDuration, returns, err := t.GetFunction()(t.GetAttempts(), quitChan, t.GetArguments()...)
+		resultChan <- []interface{}{newRepeats, newDuration, returns, err}
 	}()
 
 	for {
@@ -152,10 +153,11 @@ func (m *Workman) executeTask() {
 
 				t.SetRepeats(r[0].(int64))
 				t.SetDuration(r[1].(time.Duration))
+				t.SetReturns(r[2])
 
-				if r[2] != nil {
+				if r[3] != nil {
 					t.SetStatus(task.TaskStatusFail)
-					t.SetLastError(r[2])
+					t.SetLastError(r[3])
 				} else {
 					t.SetStatus(task.TaskStatusSuccess)
 				}
@@ -186,10 +188,11 @@ func (m *Workman) executeTask() {
 			case r := <-resultChan:
 				t.SetRepeats(r[0].(int64))
 				t.SetDuration(r[1].(time.Duration))
+				t.SetReturns(r[2])
 
-				if r[2] != nil {
+				if r[3] != nil {
 					t.SetStatus(task.TaskStatusFail)
-					t.SetLastError(r[2])
+					t.SetLastError(r[3])
 				} else {
 					t.SetStatus(task.TaskStatusSuccess)
 				}

@@ -59,6 +59,8 @@ type Tasker interface {
 	SetStatus(int64)
 	GetPriority() int64
 	SetPriority(int64)
+	GetReturns() interface{}
+	SetReturns(interface{})
 	GetLastError() interface{}
 	SetLastError(interface{})
 	GetTimeout() time.Duration
@@ -70,7 +72,7 @@ type Tasker interface {
 	SetFinishedAt(time.Time)
 }
 
-type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration, error)
+type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration, interface{}, error)
 
 type Task struct {
 	mutex sync.RWMutex
@@ -84,6 +86,7 @@ type Task struct {
 	attempts   int64
 	status     int64
 	priority   int64
+	returns    interface{}
 	lastError  interface{}
 	timeout    time.Duration
 	createdAt  time.Time
@@ -237,6 +240,20 @@ func (m *Task) SetPriority(p int64) {
 	defer m.mutex.Unlock()
 
 	m.priority = p
+}
+
+func (m *Task) GetReturns() interface{} {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	return m.returns
+}
+
+func (m *Task) SetReturns(r interface{}) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.returns = r
 }
 
 func (m *Task) GetLastError() interface{} {
