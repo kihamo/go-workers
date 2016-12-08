@@ -166,6 +166,18 @@ func (q *Tasks) HasWait() bool {
 	return q.wait > 0
 }
 
+func (q *Tasks) GetItems() []task.Tasker {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	items := make([]task.Tasker, len(q.itemsByHash))
+	for _, t := range q.itemsByHash {
+		items = append(items, t.t)
+	}
+
+	return items
+}
+
 func (q *Tasks) getHash(id string) (hash [hashLength]byte) {
 	copy(hash[:], id)
 	return hash
