@@ -170,7 +170,7 @@ func (q *Tasks) GetItems() []task.Tasker {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
-	items := make([]task.Tasker, len(q.itemsByHash))
+	items := make([]task.Tasker, 0, len(q.itemsByHash))
 	for _, t := range q.itemsByHash {
 		items = append(items, t.t)
 	}
