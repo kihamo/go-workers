@@ -224,6 +224,15 @@ func (d *Dispatcher) AddTaskByFunc(f task.TaskFunction, a ...interface{}) task.T
 	return d.AddNamedTaskByFunc("", f, a...)
 }
 
+func (d *Dispatcher) AddTaskByPriorityAndFunc(p int64, f task.TaskFunction, a ...interface{}) task.Tasker {
+	task := task.NewTask(f, a...)
+	task.SetPriority(p)
+
+	d.AddTask(task)
+
+	return task
+}
+
 func (d *Dispatcher) GetWorkers() *Workers {
 	return d.workers
 }
