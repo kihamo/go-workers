@@ -23,14 +23,18 @@ type Dispatcher struct {
 	workers *Workers
 	tasks   *Tasks
 
-	status    int64
-	listeners []Listener
+	status         int64
+	listeners      *listenerList
+	listenersTasks *listenerTasks
 
 	doneWorker       chan worker.Worker // канал уведомления о завершении рабочего
 	quitDoWorkerDone chan bool
 
-	allowProcessing       chan bool // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
-	quitDoAllowProcessing chan bool
+	allowExecuteTasks  chan bool // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
+	quitDoExecuteTasks chan bool
+
+	allowNotifyListeners  chan bool
+	quitDoNotifyListeners chan bool
 
 	quitDispatcher chan bool
 }
@@ -46,14 +50,18 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 		workers: NewWorkers(),
 		tasks:   NewTasks(),
 
-		status:    DispatcherStatusWait,
-		listeners: []Listener{},
+		status:         DispatcherStatusWait,
+		listeners:      newListenerList(),
+		listenersTasks: newListenerTasks(),
 
 		doneWorker:       make(chan worker.Worker),
 		quitDoWorkerDone: make(chan bool, 1),
 
-		allowProcessing:       make(chan bool, 1),
-		quitDoAllowProcessing: make(chan bool, 1),
+		allowExecuteTasks:  make(chan bool, 1),
+		quitDoExecuteTasks: make(chan bool, 1),
+
+		allowNotifyListeners:  make(chan bool, 1),
+		quitDoNotifyListeners: make(chan bool, 1),
 
 		quitDispatcher: make(chan bool, 1),
 	}
@@ -68,15 +76,19 @@ func (d *Dispatcher) Run() error {
 	go d.doWorkerDone()
 
 	d.wg.Add(1)
-	go d.doAllowProcessing()
+	go d.doExecuteTasks()
+
+	d.wg.Add(1)
+	go d.doNotifyListeners()
 
 	d.setStatus(DispatcherStatusProcess)
 
 	for {
 		select {
 		case <-d.quitDispatcher:
-			d.quitDoAllowProcessing <- true
+			d.quitDoExecuteTasks <- true
 			d.quitDoWorkerDone <- true
+			d.quitDoNotifyListeners <- true
 
 			d.wg.Wait()
 			d.setStatus(DispatcherStatusWait)
@@ -85,51 +97,45 @@ func (d *Dispatcher) Run() error {
 	}
 }
 
+// Обработчик сигналов завершения работы от воркеров. Перезапускает задачи, требующего повторения.
 func (d *Dispatcher) doWorkerDone() {
 	defer d.wg.Done()
 
 	for {
 		select {
 		case w := <-d.doneWorker:
-			tsk := w.GetTask()
-			d.GetTasks().Remove(tsk)
+			t := w.GetTask()
+			d.GetTasks().Remove(t)
 
 			w.Reset()
 			d.GetWorkers().Update(w)
 
-			go d.notifyAllowProcessing()
+			go d.addNotifyListeners(t)
 
-			d.mutex.RLock()
-			if len(d.listeners) > 0 {
-				for _, listener := range d.listeners {
-					// может держать процесс заблокированным, если канал не буферизированный и с малым размером
-					go func(t task.Tasker, l Listener) {
-						l.NotifyTaskDone(t)
-					}(tsk, listener)
-				}
-			}
-			d.mutex.RUnlock()
-
-			if repeats := tsk.GetRepeats(); repeats == -1 || tsk.GetAttempts() < repeats {
-				tsk.SetStatus(task.TaskStatusRepeatWait)
-				d.AddTask(tsk)
+			if repeats := t.GetRepeats(); repeats == -1 || t.GetAttempts() < repeats {
+				t.SetStatus(task.TaskStatusRepeatWait)
+				d.AddTask(t)
+			} else {
+				go d.notifyAllowExecuteTasks()
 			}
 
-		case <-d.quitDoAllowProcessing:
+		case <-d.quitDoWorkerDone:
 			return
 		}
 	}
 }
 
-func (d *Dispatcher) doAllowProcessing() {
+// Основной цикл диспетчера, после получения сигнала на обработку через канал allowExecuteTasks начинает поиск
+// задач на обработку. Сигнал allowExecuteTasks посылается при добавлении нового задания, а так же по таймеру,
+// который находится внутри doExecuteTasks, что бы исключить блокировку в обработке задач
+func (d *Dispatcher) doExecuteTasks() {
 	defer d.wg.Done()
 
-	// таймер на случай, если процесс залипнет или заполнение очередей идет не через диспетчер
 	ticker := d.GetClock().NewTicker(time.Second)
 
 	for {
 		select {
-		case <-d.allowProcessing:
+		case <-d.allowExecuteTasks:
 			for d.GetTasks().HasWait() && d.GetWorkers().HasWait() {
 				t := d.GetTasks().GetWait()
 				w := d.GetWorkers().GetWait()
@@ -164,28 +170,66 @@ func (d *Dispatcher) doAllowProcessing() {
 			}
 
 		case <-ticker.C():
-			d.notifyAllowProcessing()
+			d.notifyAllowExecuteTasks()
 
-		case <-d.quitDoWorkerDone:
+		case <-d.quitDoExecuteTasks:
 			return
 		}
 	}
 }
 
-func (d *Dispatcher) notifyAllowProcessing() {
-	if d.GetStatus() == DispatcherStatusProcess && len(d.allowProcessing) == 0 {
-		d.allowProcessing <- true
+func (d *Dispatcher) notifyAllowExecuteTasks() {
+	if d.GetStatus() == DispatcherStatusProcess && len(d.allowExecuteTasks) == 0 {
+		d.allowExecuteTasks <- true
 	}
+}
+
+// Отдельная очередь на оповещение листенеров, чтобы не блокировать основной процесс.
+// Асинхронно принимает сообщения через notifyListeners и последовательно оповещает листенеров.
+func (d *Dispatcher) doNotifyListeners() {
+	defer d.wg.Done()
+
+	ticker := d.GetClock().NewTicker(time.Hour)
+
+	for {
+		select {
+		case <-d.allowNotifyListeners:
+			listeners := d.listeners.getAll()
+
+			if len(listeners) > 0 {
+				for {
+					t := d.listenersTasks.shift()
+					if t == nil {
+						break
+					}
+
+					for _, l := range listeners {
+						l.NotifyTaskDone(t)
+					}
+				}
+			}
+		case <-ticker.C():
+			d.allowNotifyListeners <- true
+		case <-d.quitDoNotifyListeners:
+			return
+		}
+	}
+}
+
+func (d *Dispatcher) addNotifyListeners(t task.Tasker) {
+	d.listenersTasks.add(t)
+
+	d.allowNotifyListeners <- true
 }
 
 func (d *Dispatcher) addWorker(w worker.Worker) {
 	d.GetWorkers().Add(w)
-	d.notifyAllowProcessing()
+	d.notifyAllowExecuteTasks()
 }
 
 func (d *Dispatcher) addTask(t task.Tasker) {
 	d.GetTasks().Add(t)
-	d.notifyAllowProcessing()
+	d.notifyAllowExecuteTasks()
 }
 
 func (d *Dispatcher) AddWorker() worker.Worker {
@@ -272,19 +316,9 @@ func (d *Dispatcher) GetClock() clock.Clock {
 }
 
 func (d *Dispatcher) AddListener(l Listener) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	d.listeners = append(d.listeners, l)
+	d.listeners.add(l)
 }
 
 func (d *Dispatcher) RemoveListener(l Listener) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	for i := len(d.listeners) - 1; i >= 0; i-- {
-		if d.listeners[i] == l {
-			d.listeners = append(d.listeners[:i], d.listeners[i+1:]...)
-		}
-	}
+	d.listeners.remove(l)
 }

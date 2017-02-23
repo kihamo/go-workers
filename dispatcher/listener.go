@@ -12,9 +12,9 @@ type DefaultListener struct {
 	TaskDone chan task.Tasker
 }
 
-func NewDefaultListener(b int) *DefaultListener {
+func NewDefaultListener() *DefaultListener {
 	return &DefaultListener{
-		TaskDone: make(chan task.Tasker, b),
+		TaskDone: make(chan task.Tasker),
 	}
 }
 

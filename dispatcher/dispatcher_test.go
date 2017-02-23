@@ -3,8 +3,6 @@ package dispatcher
 import (
 	"testing"
 	"time"
-
-	"github.com/kihamo/go-workers/task"
 )
 
 func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, tasksCount int) {
@@ -12,11 +10,12 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		done := make(chan task.Tasker, tasksCount)
 		quit := make(chan bool, 1)
 
+		listener := NewDefaultListener()
+
 		d := NewDispatcher()
-		d.SetTaskDoneChannel(done)
+		d.AddListener(listener)
 
 		for w := 1; w <= workersCount; w++ {
 			d.AddWorker()
@@ -29,7 +28,7 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 
 			for {
 				select {
-				case <-done:
+				case <-listener.TaskDone:
 					finished++
 
 					if finished == tasksCount {
@@ -43,8 +42,8 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 		for d.GetStatus() != DispatcherStatusProcess {
 		}
 
-		f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, error) {
-			return 0, 0, nil
+		f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+			return 0, 0, nil, nil
 		}
 
 		b.StartTimer()

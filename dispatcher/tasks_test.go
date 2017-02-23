@@ -16,8 +16,8 @@ func TestTasksSuite(t *testing.T) {
 	suite.Run(t, new(TasksSuite))
 }
 
-func (s *TasksSuite) jobNothing(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, error) {
-	return 0, 0, nil
+func (s *TasksSuite) jobNothing(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+	return 0, 0, nil, nil
 }
 
 func (s *TasksSuite) Test_CreateNewInstance_ReturnsZeroLenOfQueue() {
@@ -223,8 +223,8 @@ func (s *TasksSuite) Test_CreateNewInstanceAndAddRepeatWaitTask_ReturnsFalseForH
 func BenchmarkAddAndGet(b *testing.B) {
 	c := NewTasks()
 
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, error) {
-		return 0, 0, nil
+	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+		return 0, 0, nil, nil
 	}
 
 	tasks := []task.Tasker{}
@@ -248,8 +248,8 @@ func BenchmarkAddAndGet(b *testing.B) {
 func BenchmarkAddAndRemove(b *testing.B) {
 	c := NewTasks()
 
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, error) {
-		return 0, 0, nil
+	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+		return 0, 0, nil, nil
 	}
 
 	tasks := []task.Tasker{}
@@ -273,8 +273,8 @@ func BenchmarkAddAndRemove(b *testing.B) {
 func BenchmarkAddAndRemoveById(b *testing.B) {
 	c := NewTasks()
 
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, error) {
-		return 0, 0, nil
+	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+		return 0, 0, nil, nil
 	}
 
 	tasks := []task.Tasker{}

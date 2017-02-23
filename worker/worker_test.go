@@ -27,17 +27,17 @@ func (s *WorkerSuite) SetupSuite() {
 func (s *WorkerSuite) getTaskWithSleepJob() task.Tasker {
 	c := fakeclock.NewFakeClock(s.clockTime)
 
-	return task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	return task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, interface{}, error) {
 		c.Sleep(time.Second * 6)
-		return 1, time.Second, nil
+		return 1, time.Second, nil, nil
 	})
 }
 
-func (s *WorkerSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
-	return 1, time.Second, nil
+func (s *WorkerSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, interface{}, error) {
+	return 1, time.Second, nil, nil
 }
 
-func (s *WorkerSuite) jobReturnsPanic(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+func (s *WorkerSuite) jobReturnsPanic(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, interface{}, error) {
 	panic("Panic!!!")
 }
 
@@ -323,9 +323,9 @@ func (s *WorkerSuite) Test_WithTaskWithTimeout_SetTaskStatusIsSuccess() {
 	}
 
 	c := fakeclock.NewFakeClock(s.clockTime)
-	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, interface{}, error) {
 		c.Sleep(time.Second * 6)
-		return 1, time.Second, nil
+		return 1, time.Second, nil, nil
 	})
 	t.SetTimeout(time.Second * 10)
 	w.SendTask(t)
@@ -433,9 +433,9 @@ func (s *WorkerSuite) Test_IsRunningAndAddTask_SetFinishedAt() {
 	finishedAt := w.GetClock().Now().Add(time.Second * 6)
 
 	c := fakeclock.NewFakeClock(s.clockTime)
-	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, error) {
+	t := task.NewTaskWithClock(c, func(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, interface{}, error) {
 		c.Sleep(time.Second * 6)
-		return 1, time.Second, nil
+		return 1, time.Second, nil, nil
 	})
 	w.SendTask(t)
 	for t.GetStatus() != task.TaskStatusProcess {
