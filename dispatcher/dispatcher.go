@@ -91,8 +91,8 @@ func (d *Dispatcher) doWorkerDone() {
 	for {
 		select {
 		case w := <-d.doneWorker:
-			t := w.GetTask()
-			d.GetTasks().Remove(t)
+			tsk := w.GetTask()
+			d.GetTasks().Remove(tsk)
 
 			w.Reset()
 			d.GetWorkers().Update(w)
@@ -103,16 +103,16 @@ func (d *Dispatcher) doWorkerDone() {
 			if len(d.listeners) > 0 {
 				for _, listener := range d.listeners {
 					// может держать процесс заблокированным, если канал не буферизированный и с малым размером
-					go func(l Listener) {
+					go func(t task.Tasker, l Listener) {
 						l.NotifyTaskDone(t)
-					}(listener)
+					}(tsk, listener)
 				}
 			}
 			d.mutex.RUnlock()
 
-			if repeats := t.GetRepeats(); repeats == -1 || t.GetAttempts() < repeats {
-				t.SetStatus(task.TaskStatusRepeatWait)
-				d.AddTask(t)
+			if repeats := tsk.GetRepeats(); repeats == -1 || tsk.GetAttempts() < repeats {
+				tsk.SetStatus(task.TaskStatusRepeatWait)
+				d.AddTask(tsk)
 			}
 
 		case <-d.quitDoAllowProcessing:
@@ -124,7 +124,7 @@ func (d *Dispatcher) doWorkerDone() {
 func (d *Dispatcher) doAllowProcessing() {
 	defer d.wg.Done()
 
-	// таймер на случай, если процесс залипнет или заполнение очередей идет не черз диспетчер
+	// таймер на случай, если процесс залипнет или заполнение очередей идет не через диспетчер
 	ticker := d.GetClock().NewTicker(time.Second)
 
 	for {
