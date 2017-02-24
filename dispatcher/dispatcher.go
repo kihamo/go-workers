@@ -209,7 +209,7 @@ func (d *Dispatcher) doNotifyListeners() {
 				}
 			}
 		case <-ticker.C():
-			d.allowNotifyListeners <- true
+			d.notifyAllowNotifyListeners()
 		case <-d.quitDoNotifyListeners:
 			return
 		}
@@ -218,8 +218,13 @@ func (d *Dispatcher) doNotifyListeners() {
 
 func (d *Dispatcher) addNotifyListeners(t task.Tasker) {
 	d.listenersTasks.add(t)
+	d.notifyAllowNotifyListeners()
+}
 
-	d.allowNotifyListeners <- true
+func (d *Dispatcher) notifyAllowNotifyListeners() {
+	if len(d.allowNotifyListeners) == 0 {
+		d.allowNotifyListeners <- true
+	}
 }
 
 func (d *Dispatcher) addWorker(w worker.Worker) {
