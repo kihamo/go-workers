@@ -30,11 +30,13 @@ type Dispatcher struct {
 	doneWorker       chan worker.Worker // канал уведомления о завершении рабочего
 	quitDoWorkerDone chan bool
 
-	allowExecuteTasks  chan bool // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
-	quitDoExecuteTasks chan bool
+	allowExecuteTasks    chan bool // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
+	quitDoExecuteTasks   chan bool
+	tickerDoExecuteTasks chan time.Duration
 
-	allowNotifyListeners  chan bool
-	quitDoNotifyListeners chan bool
+	allowNotifyListeners    chan bool
+	quitDoNotifyListeners   chan bool
+	tickerDoNotifyListeners chan time.Duration
 
 	quitDispatcher chan bool
 }
@@ -57,11 +59,13 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 		doneWorker:       make(chan worker.Worker),
 		quitDoWorkerDone: make(chan bool, 1),
 
-		allowExecuteTasks:  make(chan bool, 1),
-		quitDoExecuteTasks: make(chan bool, 1),
+		allowExecuteTasks:    make(chan bool, 1),
+		quitDoExecuteTasks:   make(chan bool, 1),
+		tickerDoExecuteTasks: make(chan time.Duration),
 
-		allowNotifyListeners:  make(chan bool, 1),
-		quitDoNotifyListeners: make(chan bool, 1),
+		allowNotifyListeners:    make(chan bool, 1),
+		quitDoNotifyListeners:   make(chan bool, 1),
+		tickerDoNotifyListeners: make(chan time.Duration),
 
 		quitDispatcher: make(chan bool, 1),
 	}
@@ -172,6 +176,9 @@ func (d *Dispatcher) doExecuteTasks() {
 		case <-ticker.C():
 			d.notifyAllowExecuteTasks()
 
+		case t := <-d.tickerDoExecuteTasks:
+			ticker = d.GetClock().NewTicker(t)
+
 		case <-d.quitDoExecuteTasks:
 			return
 		}
@@ -189,7 +196,7 @@ func (d *Dispatcher) notifyAllowExecuteTasks() {
 func (d *Dispatcher) doNotifyListeners() {
 	defer d.wg.Done()
 
-	ticker := d.GetClock().NewTicker(time.Hour)
+	ticker := d.GetClock().NewTicker(time.Second)
 
 	for {
 		select {
@@ -208,8 +215,13 @@ func (d *Dispatcher) doNotifyListeners() {
 					}
 				}
 			}
+
 		case <-ticker.C():
 			d.notifyAllowNotifyListeners()
+
+		case t := <-d.tickerDoNotifyListeners:
+			ticker = d.GetClock().NewTicker(t)
+
 		case <-d.quitDoNotifyListeners:
 			return
 		}
@@ -334,4 +346,12 @@ func (d *Dispatcher) RemoveListener(l Listener) {
 
 func (d *Dispatcher) GetListenersTasks() []task.Tasker {
 	return d.listenersTasks.GetAll()
+}
+
+func (d *Dispatcher) SetTickerExecuteTasksDuration(t time.Duration) {
+	d.tickerDoExecuteTasks <- t
+}
+
+func (d *Dispatcher) SetTickerNotifyListenersDuration(t time.Duration) {
+	d.tickerDoNotifyListeners <- t
 }
