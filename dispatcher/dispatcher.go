@@ -24,8 +24,8 @@ type Dispatcher struct {
 	tasks   *Tasks
 
 	status         int64
-	listeners      *listenerList
-	listenersTasks *listenerTasks
+	listeners      *ListenerList
+	listenersTasks *ListenerTasks
 
 	doneWorker       chan worker.Worker // канал уведомления о завершении рабочего
 	quitDoWorkerDone chan bool
@@ -51,8 +51,8 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 		tasks:   NewTasks(),
 
 		status:         DispatcherStatusWait,
-		listeners:      newListenerList(),
-		listenersTasks: newListenerTasks(),
+		listeners:      NewListenerList(),
+		listenersTasks: NewListenerTasks(),
 
 		doneWorker:       make(chan worker.Worker),
 		quitDoWorkerDone: make(chan bool, 1),
@@ -194,11 +194,11 @@ func (d *Dispatcher) doNotifyListeners() {
 	for {
 		select {
 		case <-d.allowNotifyListeners:
-			listeners := d.listeners.getAll()
+			listeners := d.listeners.GetAll()
 
 			if len(listeners) > 0 {
 				for {
-					t := d.listenersTasks.shift()
+					t := d.listenersTasks.Shift()
 					if t == nil {
 						break
 					}
@@ -217,7 +217,7 @@ func (d *Dispatcher) doNotifyListeners() {
 }
 
 func (d *Dispatcher) addNotifyListeners(t task.Tasker) {
-	d.listenersTasks.add(t)
+	d.listenersTasks.Add(t)
 	d.notifyAllowNotifyListeners()
 }
 
@@ -320,10 +320,18 @@ func (d *Dispatcher) GetClock() clock.Clock {
 	return d.clock
 }
 
+func (d *Dispatcher) GetListeners() []Listener {
+	return d.listeners.GetAll()
+}
+
 func (d *Dispatcher) AddListener(l Listener) {
-	d.listeners.add(l)
+	d.listeners.Add(l)
 }
 
 func (d *Dispatcher) RemoveListener(l Listener) {
-	d.listeners.remove(l)
+	d.listeners.Remove(l)
+}
+
+func (d *Dispatcher) GetListenersTasks() []task.Tasker {
+	return d.listenersTasks.GetAll()
 }

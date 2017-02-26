@@ -4,32 +4,32 @@ import (
 	"sync"
 )
 
-type listenerList struct {
+type ListenerList struct {
 	mutex sync.RWMutex
 	items []Listener
 }
 
-func newListenerList() *listenerList {
-	return &listenerList{
+func NewListenerList() *ListenerList {
+	return &ListenerList{
 		items: make([]Listener, 0),
 	}
 }
 
-func (l *listenerList) getAll() []Listener {
+func (l *ListenerList) GetAll() []Listener {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 
 	return l.items[:]
 }
 
-func (l *listenerList) add(item Listener) {
+func (l *ListenerList) Add(item Listener) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
 	l.items = append(l.items, item)
 }
 
-func (l *listenerList) remove(item Listener) {
+func (l *ListenerList) Remove(item Listener) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
