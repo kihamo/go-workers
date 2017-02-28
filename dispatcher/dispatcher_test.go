@@ -28,7 +28,7 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 
 			for {
 				select {
-				case <-listener.TaskDone:
+				case <-listener.GetTaskDoneChannel():
 					finished++
 
 					if finished == tasksCount {

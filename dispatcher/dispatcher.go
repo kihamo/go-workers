@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/clock"
+	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/task"
 	"github.com/kihamo/go-workers/worker"
 )
@@ -32,11 +33,11 @@ type Dispatcher struct {
 
 	allowExecuteTasks    chan bool // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
 	quitDoExecuteTasks   chan bool
-	tickerDoExecuteTasks chan time.Duration
+	tickerDoExecuteTasks *workers.Ticker
 
 	allowNotifyListeners    chan bool
 	quitDoNotifyListeners   chan bool
-	tickerDoNotifyListeners chan time.Duration
+	tickerDoNotifyListeners *workers.Ticker
 
 	quitDispatcher chan bool
 }
@@ -61,11 +62,11 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 
 		allowExecuteTasks:    make(chan bool, 1),
 		quitDoExecuteTasks:   make(chan bool, 1),
-		tickerDoExecuteTasks: make(chan time.Duration),
+		tickerDoExecuteTasks: workers.NewTicker(time.Second),
 
 		allowNotifyListeners:    make(chan bool, 1),
 		quitDoNotifyListeners:   make(chan bool, 1),
-		tickerDoNotifyListeners: make(chan time.Duration),
+		tickerDoNotifyListeners: workers.NewTicker(time.Second),
 
 		quitDispatcher: make(chan bool, 1),
 	}
@@ -135,10 +136,12 @@ func (d *Dispatcher) doWorkerDone() {
 func (d *Dispatcher) doExecuteTasks() {
 	defer d.wg.Done()
 
-	ticker := d.GetClock().NewTicker(time.Second)
-
 	for {
 		select {
+		case <-d.quitDoExecuteTasks:
+			d.tickerDoExecuteTasks.Stop()
+			return
+
 		case <-d.allowExecuteTasks:
 			for d.GetTasks().HasWait() && d.GetWorkers().HasWait() {
 				t := d.GetTasks().GetWait()
@@ -173,14 +176,8 @@ func (d *Dispatcher) doExecuteTasks() {
 				}()
 			}
 
-		case <-ticker.C():
+		case <-d.tickerDoExecuteTasks.C():
 			d.notifyAllowExecuteTasks()
-
-		case t := <-d.tickerDoExecuteTasks:
-			ticker = d.GetClock().NewTicker(t)
-
-		case <-d.quitDoExecuteTasks:
-			return
 		}
 	}
 }
@@ -196,13 +193,14 @@ func (d *Dispatcher) notifyAllowExecuteTasks() {
 func (d *Dispatcher) doNotifyListeners() {
 	defer d.wg.Done()
 
-	ticker := d.GetClock().NewTicker(time.Second)
-
 	for {
 		select {
+		case <-d.quitDoNotifyListeners:
+			d.tickerDoNotifyListeners.Stop()
+			return
+
 		case <-d.allowNotifyListeners:
 			listeners := d.listeners.GetAll()
-
 			if len(listeners) > 0 {
 				for {
 					t := d.listenersTasks.Shift()
@@ -216,14 +214,8 @@ func (d *Dispatcher) doNotifyListeners() {
 				}
 			}
 
-		case <-ticker.C():
+		case <-d.tickerDoNotifyListeners.C():
 			d.notifyAllowNotifyListeners()
-
-		case t := <-d.tickerDoNotifyListeners:
-			ticker = d.GetClock().NewTicker(t)
-
-		case <-d.quitDoNotifyListeners:
-			return
 		}
 	}
 }
@@ -349,9 +341,9 @@ func (d *Dispatcher) GetListenersTasks() []task.Tasker {
 }
 
 func (d *Dispatcher) SetTickerExecuteTasksDuration(t time.Duration) {
-	d.tickerDoExecuteTasks <- t
+	d.tickerDoExecuteTasks.SetDuration(t)
 }
 
 func (d *Dispatcher) SetTickerNotifyListenersDuration(t time.Duration) {
-	d.tickerDoNotifyListeners <- t
+	d.tickerDoNotifyListeners.SetDuration(t)
 }

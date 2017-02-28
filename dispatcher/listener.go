@@ -9,15 +9,19 @@ type Listener interface {
 }
 
 type DefaultListener struct {
-	TaskDone chan task.Tasker
+	taskDone chan task.Tasker
 }
 
 func NewDefaultListener() *DefaultListener {
 	return &DefaultListener{
-		TaskDone: make(chan task.Tasker),
+		taskDone: make(chan task.Tasker, 1),
 	}
 }
 
 func (l *DefaultListener) NotifyTaskDone(t task.Tasker) {
-	l.TaskDone <- t
+	l.taskDone <- t
+}
+
+func (l *DefaultListener) GetTaskDoneChannel() <-chan task.Tasker {
+	return l.taskDone
 }
