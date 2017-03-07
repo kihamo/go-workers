@@ -6,6 +6,7 @@ import (
 
 type Listener interface {
 	NotifyTaskDone(task.Tasker)
+	GetTaskDoneChannel() <-chan task.Tasker
 }
 
 type DefaultListener struct {
@@ -14,7 +15,7 @@ type DefaultListener struct {
 
 func NewDefaultListener() *DefaultListener {
 	return &DefaultListener{
-		taskDone: make(chan task.Tasker, 1),
+		taskDone: make(chan task.Tasker),
 	}
 }
 

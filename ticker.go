@@ -9,13 +9,16 @@ import (
 )
 
 type Ticker struct {
-	c       chan time.Time
-	change  chan time.Duration
-	clock   clock.Clock
 	started atomic.Value
-	stop    chan bool
-	ticker  clock.Ticker
-	once    sync.Once
+
+	c      chan time.Time
+	change chan time.Duration
+	stop   chan struct{}
+
+	clock  clock.Clock
+	ticker clock.Ticker
+
+	once sync.Once
 }
 
 func NewTicker(d time.Duration) *Ticker {
@@ -23,8 +26,8 @@ func NewTicker(d time.Duration) *Ticker {
 	t := &Ticker{
 		c:      make(chan time.Time, 1),
 		change: make(chan time.Duration, 1),
+		stop:   make(chan struct{}, 1),
 		clock:  c,
-		stop:   make(chan bool, 1),
 		ticker: c.NewTicker(d),
 	}
 
@@ -45,8 +48,10 @@ func (t *Ticker) run() {
 			}
 
 			return
+
 		case c := <-t.ticker.C():
 			t.c <- c
+
 		case d := <-t.change:
 			t.ticker = t.clock.NewTicker(d)
 		}
@@ -73,5 +78,5 @@ func (t *Ticker) Start() {
 }
 
 func (t *Ticker) Stop() {
-	t.stop <- true
+	t.stop <- struct{}{}
 }

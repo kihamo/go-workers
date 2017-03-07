@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"time"
 
@@ -209,7 +210,19 @@ func (d *Dispatcher) doNotifyListeners() {
 					}
 
 					for _, l := range listeners {
-						l.NotifyTaskDone(t)
+						done := make(chan struct{}, 1)
+
+						go func() {
+							l.NotifyTaskDone(t)
+							done <- struct{}{}
+						}()
+
+						select {
+						case <-done:
+						case <-time.After(time.Second):
+							d := <-l.GetTaskDoneChannel()
+							log.Print("Cancel send event to listener by timeout for task " + d.GetName())
+						}
 					}
 				}
 			}
