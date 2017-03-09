@@ -221,7 +221,7 @@ func (d *Dispatcher) doNotifyListeners() {
 						case <-done:
 						case <-time.After(time.Second):
 							d := <-l.GetTaskDoneChannel()
-							log.Printf("Cancel send event to listener by timeout for task \"%s\"", d.GetName())
+							log.Printf("Cancel send event to listener \"%s\" by timeout for task \"%s\"", l.GetName(), d.GetName())
 						}
 					}
 				}
