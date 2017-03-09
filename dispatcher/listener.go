@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 
 	"github.com/kihamo/go-workers/task"
@@ -10,7 +11,7 @@ import (
 type Listener interface {
 	GetName() string
 	NotifyTaskDone(task.Tasker)
-	NotifyTaskDoneTimeout()
+	NotifyTaskDoneTimeout(task.Tasker)
 }
 
 type DefaultListener struct {
@@ -40,7 +41,8 @@ func (l *DefaultListener) NotifyTaskDone(t task.Tasker) {
 	l.taskDone <- t
 }
 
-func (l *DefaultListener) NotifyTaskDoneTimeout() {
+func (l *DefaultListener) NotifyTaskDoneTimeout(t task.Tasker) {
+	log.Printf("Cancel send event to listener \"%s\" by timeout for task \"%s\"", l.GetName(), t.GetName())
 	<-l.taskDone
 }
 

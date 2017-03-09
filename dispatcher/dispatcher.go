@@ -2,7 +2,6 @@ package dispatcher
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 
@@ -220,8 +219,7 @@ func (d *Dispatcher) doNotifyListeners() {
 						select {
 						case <-done:
 						case <-time.After(time.Second):
-							log.Printf("Cancel send event to listener \"%s\" by timeout for task \"%s\"", l.GetName(), t.GetName())
-							l.NotifyTaskDoneTimeout()
+							l.NotifyTaskDoneTimeout(t)
 						}
 					}
 				}
