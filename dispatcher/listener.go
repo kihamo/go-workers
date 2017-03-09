@@ -10,7 +10,7 @@ import (
 type Listener interface {
 	GetName() string
 	NotifyTaskDone(task.Tasker)
-	GetTaskDoneChannel() <-chan task.Tasker
+	NotifyTaskDoneTimeout()
 }
 
 type DefaultListener struct {
@@ -38,6 +38,10 @@ func (l *DefaultListener) GetName() string {
 
 func (l *DefaultListener) NotifyTaskDone(t task.Tasker) {
 	l.taskDone <- t
+}
+
+func (l *DefaultListener) NotifyTaskDoneTimeout() {
+	<-l.taskDone
 }
 
 func (l *DefaultListener) GetTaskDoneChannel() <-chan task.Tasker {

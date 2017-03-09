@@ -220,8 +220,8 @@ func (d *Dispatcher) doNotifyListeners() {
 						select {
 						case <-done:
 						case <-time.After(time.Second):
-							d := <-l.GetTaskDoneChannel()
-							log.Printf("Cancel send event to listener \"%s\" by timeout for task \"%s\"", l.GetName(), d.GetName())
+							log.Printf("Cancel send event to listener \"%s\" by timeout for task \"%s\"", l.GetName(), t.GetName())
+							l.NotifyTaskDoneTimeout()
 						}
 					}
 				}
