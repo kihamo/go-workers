@@ -39,6 +39,10 @@ func (l *ListenerList) Remove(listener Listener) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
+	if item, ok := listener.(*listenerItem); ok {
+		listener = item.listener
+	}
+
 	for i := len(l.items) - 1; i >= 0; i-- {
 		if l.items[i].listener == listener {
 			l.items = append(l.items[:i], l.items[i+1:]...)
