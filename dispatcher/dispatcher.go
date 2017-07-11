@@ -110,10 +110,10 @@ func (d *Dispatcher) doWorkerDone() {
 		select {
 		case w := <-d.doneWorker:
 			t := w.GetTask()
-			d.GetTasks().Remove(t)
+			d.getSafeTasks().Remove(t)
 
 			w.Reset()
-			d.GetWorkers().Update(w)
+			d.getSafeWorkers().Update(w)
 
 			go d.addNotifyListeners(t)
 
@@ -143,9 +143,12 @@ func (d *Dispatcher) doExecuteTasks() {
 			return
 
 		case <-d.allowExecuteTasks:
-			for d.GetTasks().HasWait() && d.GetWorkers().HasWait() {
-				t := d.GetTasks().GetWait()
-				w := d.GetWorkers().GetWait()
+			workersList := d.getSafeWorkers()
+			tasksList := d.getSafeTasks()
+
+			for tasksList.HasWait() && workersList.HasWait() {
+				t := tasksList.GetWait()
+				w := workersList.GetWait()
 
 				changeStatus := make(chan int64, 1)
 				w.SetChangeStatusChannel(changeStatus)
@@ -200,10 +203,14 @@ func (d *Dispatcher) doNotifyListeners() {
 			return
 
 		case <-d.allowNotifyListeners:
-			listeners := d.listeners.GetAll()
+			listeners := d.GetListeners()
 			if len(listeners) > 0 {
+				d.mutex.RLock()
+				list := d.listenersTasks
+				d.mutex.RUnlock()
+
 				for {
-					t := d.listenersTasks.Shift()
+					t := list.Shift()
 					if t == nil {
 						break
 					}
@@ -243,12 +250,7 @@ func (d *Dispatcher) notifyAllowNotifyListeners() {
 }
 
 func (d *Dispatcher) addWorker(w worker.Worker) {
-	d.GetWorkers().Add(w)
-	d.notifyAllowExecuteTasks()
-}
-
-func (d *Dispatcher) addTask(t task.Tasker) {
-	d.GetTasks().Add(t)
+	d.getSafeWorkers().Add(w)
 	d.notifyAllowExecuteTasks()
 }
 
@@ -257,6 +259,29 @@ func (d *Dispatcher) AddWorker() worker.Worker {
 	d.addWorker(w)
 
 	return w
+}
+
+func (d *Dispatcher) getSafeWorkers() *Workers {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	return d.workers
+}
+
+func (d *Dispatcher) GetWorkers() []worker.Worker {
+	return d.getSafeWorkers().GetItems()
+}
+
+func (d *Dispatcher) RemoveWorker(w worker.Worker) {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	d.workers.Remove(w)
+}
+
+func (d *Dispatcher) addTask(t task.Tasker) {
+	d.getSafeTasks().Add(t)
+	d.notifyAllowExecuteTasks()
 }
 
 func (d *Dispatcher) AddTask(t task.Tasker) {
@@ -297,12 +322,38 @@ func (d *Dispatcher) AddTaskByPriorityAndFunc(p int64, f task.TaskFunction, a ..
 	return task
 }
 
-func (d *Dispatcher) GetWorkers() *Workers {
-	return d.workers
+func (d *Dispatcher) getSafeTasks() *Tasks {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	return d.tasks
 }
 
-func (d *Dispatcher) GetTasks() *Tasks {
-	return d.tasks
+func (d *Dispatcher) GetTasks() []task.Tasker {
+	return d.getSafeTasks().GetItems()
+}
+
+func (d *Dispatcher) Reset() {
+	d.mutex.Lock()
+
+	ws := d.workers.GetItems()
+
+	go func() {
+		for _, w := range ws {
+			w.Kill()
+		}
+	}()
+
+	d.workers = NewWorkers()
+	d.tasks = NewTasks()
+	d.listeners = NewListenerList()
+	d.listenersTasks = NewListenerTasks()
+
+	d.mutex.Unlock()
+
+	for i := 0; i < len(ws); i++ {
+		d.AddWorker()
+	}
 }
 
 func (d *Dispatcher) Kill() error {
@@ -336,18 +387,30 @@ func (d *Dispatcher) GetClock() clock.Clock {
 }
 
 func (d *Dispatcher) GetListeners() []Listener {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
 	return d.listeners.GetAll()
 }
 
 func (d *Dispatcher) AddListener(l Listener) {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
 	d.listeners.Add(l)
 }
 
 func (d *Dispatcher) RemoveListener(l Listener) {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
 	d.listeners.Remove(l)
 }
 
 func (d *Dispatcher) GetListenersTasks() []task.Tasker {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
 	return d.listenersTasks.GetAll()
 }
 

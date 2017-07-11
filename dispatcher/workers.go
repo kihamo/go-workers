@@ -53,6 +53,21 @@ func (q *Workers) Add(w worker.Worker) {
 	}
 }
 
+func (q *Workers) Remove(w worker.Worker) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
+	if item, ok := q.items[w.GetId()]; ok {
+		q.container.Remove(item.element)
+
+		if item.lastStatus == worker.WorkerStatusWait {
+			q.wait--
+		}
+
+		delete(q.items, w.GetId())
+	}
+}
+
 func (q *Workers) GetWait() (w worker.Worker) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()

@@ -131,6 +131,7 @@ func (m *Workman) executeTask() {
 			t.SetFinishedAt(m.GetClock().Now())
 
 			if err := recover(); err != nil {
+				// TODO: log stack trace
 				errorChan <- err
 			}
 
@@ -223,6 +224,10 @@ func (m *Workman) Kill() error {
 }
 
 func (m *Workman) Reset() {
+	if m.GetStatus() == WorkerStatusBusy {
+		m.killTask <- true
+	}
+
 	m.setTask(nil)
 }
 
