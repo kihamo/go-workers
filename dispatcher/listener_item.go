@@ -2,6 +2,7 @@ package dispatcher
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kihamo/go-workers/task"
@@ -10,55 +11,102 @@ import (
 type ListenerItem interface {
 	Listener
 
-	GetCreated() time.Time
-	GetUpdated() time.Time
+	GetCreatedAt() time.Time
+	GetLastTaskSuccessAt() *time.Time
+	GetLastTaskFailedAt() *time.Time
+	GetCountTaskSuccess() uint64
+	GetCountTaskFailed() uint64
 }
 
 type listenerItem struct {
 	mutex    sync.RWMutex
 	listener Listener
-	created  time.Time
-	updated  time.Time
+
+	createdAt         time.Time
+	lastTaskSuccessAt *time.Time
+	lastTaskFailedAt  *time.Time
+
+	countTaskSuccess uint64
+	countTaskFailed  uint64
 }
 
 func NewListenerItem(l Listener) *listenerItem {
 	return &listenerItem{
-		listener: l,
-		created:  time.Now(),
-		updated:  time.Now(),
+		listener:  l,
+		createdAt: time.Now(),
 	}
 }
 
-func (l *listenerItem) update() {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-
-	l.updated = time.Now()
+func (l *listenerItem) GetCreatedAt() time.Time {
+	return l.createdAt
 }
 
-func (l *listenerItem) GetCreated() time.Time {
-	return l.created
-}
-
-func (l *listenerItem) GetUpdated() time.Time {
+func (l *listenerItem) GetLastTaskSuccessAt() *time.Time {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 
-	return l.updated
+	return l.lastTaskSuccessAt
+}
+
+func (l *listenerItem) GetLastTaskFailedAt() *time.Time {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	return l.lastTaskFailedAt
+}
+
+func (l *listenerItem) GetCountTaskSuccess() uint64 {
+	return atomic.LoadUint64(&l.countTaskSuccess)
+}
+
+func (l *listenerItem) GetCountTaskFailed() uint64 {
+	return atomic.LoadUint64(&l.countTaskFailed)
+}
+
+func (l *listenerItem) successTask() {
+	now := time.Now()
+
+	l.mutex.Lock()
+	l.lastTaskSuccessAt = &now
+	l.mutex.Unlock()
+
+	atomic.AddUint64(&l.countTaskSuccess, 1)
+}
+
+func (l *listenerItem) failedTask() {
+	now := time.Now()
+
+	l.mutex.Lock()
+	l.lastTaskFailedAt = &now
+	l.mutex.Unlock()
+
+	atomic.AddUint64(&l.countTaskFailed, 1)
 }
 
 func (l *listenerItem) GetName() string {
 	return l.listener.GetName()
 }
 
-func (l *listenerItem) NotifyTaskDone(t task.Tasker) {
-	l.update()
+func (l *listenerItem) NotifyTaskDone(t task.Tasker) error {
+	err := l.listener.NotifyTaskDone(t)
 
-	l.listener.NotifyTaskDone(t)
+	if err == nil {
+		l.successTask()
+	} else {
+		l.failedTask()
+	}
+
+	return err
 }
 
-func (l *listenerItem) NotifyTaskDoneTimeout(t task.Tasker) {
-	l.update()
+func (l *listenerItem) NotifyTaskDoneTimeout(t task.Tasker) error {
+	err := l.listener.NotifyTaskDoneTimeout(t)
 
-	l.listener.NotifyTaskDoneTimeout(t)
+	if err == nil {
+		l.successTask()
+	} else {
+		l.failedTask()
+	}
+
+	return err
 }

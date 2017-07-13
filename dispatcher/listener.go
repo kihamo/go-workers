@@ -10,8 +10,8 @@ import (
 
 type Listener interface {
 	GetName() string
-	NotifyTaskDone(task.Tasker)
-	NotifyTaskDoneTimeout(task.Tasker)
+	NotifyTaskDone(task.Tasker) error
+	NotifyTaskDoneTimeout(task.Tasker) error
 }
 
 type DefaultListener struct {
@@ -37,13 +37,17 @@ func (l *DefaultListener) GetName() string {
 	return l.name
 }
 
-func (l *DefaultListener) NotifyTaskDone(t task.Tasker) {
+func (l *DefaultListener) NotifyTaskDone(t task.Tasker) error {
 	l.taskDone <- t
+
+	return nil
 }
 
-func (l *DefaultListener) NotifyTaskDoneTimeout(t task.Tasker) {
+func (l *DefaultListener) NotifyTaskDoneTimeout(t task.Tasker) error {
 	log.Printf("Cancel send event to listener \"%s\" by timeout for task \"%s\"", l.GetName(), t.GetName())
 	<-l.taskDone
+
+	return nil
 }
 
 func (l *DefaultListener) GetTaskDoneChannel() <-chan task.Tasker {
