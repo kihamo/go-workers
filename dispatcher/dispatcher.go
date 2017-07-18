@@ -205,9 +205,7 @@ func (d *Dispatcher) doNotifyListeners() {
 		case <-d.allowNotifyListeners:
 			listeners := d.GetListeners()
 			if len(listeners) > 0 {
-				d.mutex.RLock()
-				list := d.listenersTasks
-				d.mutex.RUnlock()
+				list := d.getSafeListenersTasks()
 
 				for {
 					t := list.Shift()
@@ -273,10 +271,7 @@ func (d *Dispatcher) GetWorkers() []worker.Worker {
 }
 
 func (d *Dispatcher) RemoveWorker(w worker.Worker) {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	d.workers.Remove(w)
+	d.getSafeWorkers().Remove(w)
 }
 
 func (d *Dispatcher) addTask(t task.Tasker) {
@@ -333,6 +328,14 @@ func (d *Dispatcher) GetTasks() []task.Tasker {
 	return d.getSafeTasks().GetItems()
 }
 
+func (d *Dispatcher) RemoveTask(t task.Tasker) {
+	d.getSafeTasks().Remove(t)
+}
+
+func (d *Dispatcher) RemoveTaskById(id string) {
+	d.getSafeTasks().RemoveById(id)
+}
+
 func (d *Dispatcher) Reset() {
 	d.mutex.Lock()
 
@@ -386,32 +389,34 @@ func (d *Dispatcher) GetClock() clock.Clock {
 	return d.clock
 }
 
-func (d *Dispatcher) GetListeners() []Listener {
+func (d *Dispatcher) getSafeListeners() *ListenerList {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	return d.listeners.GetAll()
+	return d.listeners
+}
+
+func (d *Dispatcher) GetListeners() []Listener {
+	return d.getSafeListeners().GetAll()
 }
 
 func (d *Dispatcher) AddListener(l Listener) {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	d.listeners.Add(l)
+	d.getSafeListeners().Add(l)
 }
 
 func (d *Dispatcher) RemoveListener(l Listener) {
+	d.getSafeListeners().Remove(l)
+}
+
+func (d *Dispatcher) getSafeListenersTasks() *ListenerTasks {
 	d.mutex.RLock()
 	defer d.mutex.RUnlock()
 
-	d.listeners.Remove(l)
+	return d.listenersTasks
 }
 
 func (d *Dispatcher) GetListenersTasks() []task.Tasker {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	return d.listenersTasks.GetAll()
+	return d.getSafeListenersTasks().GetAll()
 }
 
 func (d *Dispatcher) SetTickerExecuteTasksDuration(t time.Duration) {
