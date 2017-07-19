@@ -12,7 +12,7 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 	for i := 0; i < b.N; i++ {
 		quit := make(chan bool, 1)
 
-		listener := NewDefaultListener()
+		listener := NewDefaultListener("test-d")
 
 		d := NewDispatcher()
 		d.AddListener(listener)
