@@ -451,3 +451,27 @@ func (s *WorkerSuite) Test_IsRunningAndAddTask_SetFinishedAt() {
 
 	w.Kill()
 }
+
+func BenchmarkGettersSetters(b *testing.B) {
+	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+		return 0, 0, nil, nil
+	}
+	t := task.NewTask(f)
+	w := NewWorkman(make(chan Worker))
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			w.setTask(t)
+			w.setStatus(WorkerStatusBusy)
+			w.SetChangeStatusChannel(make(chan int64))
+
+			w.GetTask()
+			w.GetId()
+			w.GetStatus()
+			w.GetCreatedAt()
+			w.GetClock()
+
+		}
+	})
+}

@@ -202,12 +202,11 @@ func BenchmarkGettersSetters(b *testing.B) {
 	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 		return 0, 0, nil, nil
 	}
+	t := NewTask(f)
 
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			t := NewTask(f)
-
 			t.SetAttempts(1)
 			t.SetDuration(time.Second)
 			t.SetFinishedAt(time.Now())

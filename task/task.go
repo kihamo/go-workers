@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"code.cloudfoundry.org/clock"
 	"github.com/google/uuid"
@@ -76,8 +76,6 @@ type Tasker interface {
 type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration, interface{}, error)
 
 type Task struct {
-	mutex sync.RWMutex
-
 	fn         TaskFunction
 	args       []interface{}
 	id         string
@@ -91,8 +89,8 @@ type Task struct {
 	lastError  atomic.Value
 	timeout    int64
 	createdAt  time.Time
-	startedAt  *time.Time
-	finishedAt *time.Time
+	startedAt  unsafe.Pointer
+	finishedAt unsafe.Pointer
 }
 
 func NewTask(f TaskFunction, a ...interface{}) *Task {
@@ -211,7 +209,11 @@ func (m *Task) GetReturns() interface{} {
 }
 
 func (m *Task) SetReturns(r interface{}) {
-	m.returns.Store(r)
+	if r == nil {
+		m.returns = atomic.Value{}
+	} else {
+		m.returns.Store(r)
+	}
 }
 
 func (m *Task) GetLastError() interface{} {
@@ -219,7 +221,11 @@ func (m *Task) GetLastError() interface{} {
 }
 
 func (m *Task) SetLastError(e interface{}) {
-	m.lastError.Store(e)
+	if e == nil {
+		m.lastError = atomic.Value{}
+	} else {
+		m.lastError.Store(e)
+	}
 }
 
 func (m *Task) GetCreatedAt() time.Time {
@@ -227,35 +233,21 @@ func (m *Task) GetCreatedAt() time.Time {
 }
 
 func (m *Task) GetStartedAt() *time.Time {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	// TODO: copy value
-
-	return m.startedAt
+	p := atomic.LoadPointer(&m.startedAt)
+	return (*time.Time)(p)
 }
 
 func (m *Task) SetStartedAt(t time.Time) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.startedAt = &t
+	atomic.StorePointer(&m.startedAt, unsafe.Pointer(&t))
 }
 
 func (m *Task) GetFinishedAt() *time.Time {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	// TODO: copy value
-
-	return m.finishedAt
+	p := atomic.LoadPointer(&m.finishedAt)
+	return (*time.Time)(p)
 }
 
 func (m *Task) SetFinishedAt(t time.Time) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.finishedAt = &t
+	atomic.StorePointer(&m.finishedAt, unsafe.Pointer(&t))
 }
 
 func (m *Task) GetTimeout() time.Duration {

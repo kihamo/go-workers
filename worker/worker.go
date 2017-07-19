@@ -3,6 +3,7 @@ package worker
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"code.cloudfoundry.org/clock"
@@ -30,7 +31,6 @@ type Worker interface {
 }
 
 type Workman struct {
-	mutex sync.RWMutex
 	wg    sync.WaitGroup
 	clock clock.Clock
 
@@ -38,11 +38,11 @@ type Workman struct {
 	status    int64
 	createdAt time.Time
 
-	changeStatus chan int64
+	changeStatus atomic.Value
 	kill         chan bool
 	done         chan Worker
 
-	task     task.Tasker
+	task     atomic.Value
 	newTask  chan task.Tasker
 	killTask chan bool
 }
@@ -232,17 +232,21 @@ func (m *Workman) Reset() {
 }
 
 func (m *Workman) GetTask() task.Tasker {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+	t := m.task.Load()
 
-	return m.task
+	if t != nil {
+		return t.(task.Tasker)
+	}
+
+	return nil
 }
 
 func (m *Workman) setTask(t task.Tasker) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.task = t
+	if t == nil {
+		m.task = atomic.Value{}
+	} else {
+		m.task.Store(t)
+	}
 }
 
 func (m *Workman) SendTask(t task.Tasker) {
@@ -250,47 +254,44 @@ func (m *Workman) SendTask(t task.Tasker) {
 }
 
 func (m *Workman) SetChangeStatusChannel(c chan int64) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	if c == nil {
+		m.changeStatus = atomic.Value{}
+	} else {
+		m.changeStatus.Store(c)
+	}
+}
 
-	m.changeStatus = c
+func (m *Workman) getChangeStatusChannel() chan int64 {
+	c := m.changeStatus.Load()
+
+	if c != nil {
+		return c.(chan int64)
+	}
+
+	return nil
 }
 
 func (m *Workman) GetId() string {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	return m.id
 }
 
 func (m *Workman) GetStatus() int64 {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.status
+	return atomic.LoadInt64(&m.status)
 }
 
 func (m *Workman) setStatus(s int64) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	if m.changeStatus != nil && m.status != s {
-		m.changeStatus <- s
+	c := m.getChangeStatusChannel()
+	if c != nil && m.GetStatus() != s {
+		c <- s
 	}
 
-	m.status = s
+	atomic.StoreInt64(&m.status, s)
 }
 
 func (m *Workman) GetCreatedAt() time.Time {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	return m.createdAt
 }
 
 func (m *Workman) GetClock() clock.Clock {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	return m.clock
 }
