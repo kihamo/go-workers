@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"code.cloudfoundry.org/clock"
@@ -369,23 +370,14 @@ func (d *Dispatcher) Kill() error {
 }
 
 func (d *Dispatcher) GetStatus() int64 {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
-	return d.status
+	return atomic.LoadInt64(&d.status)
 }
 
 func (d *Dispatcher) setStatus(s int64) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	d.status = s
+	atomic.StoreInt64(&d.status, s)
 }
 
 func (d *Dispatcher) GetClock() clock.Clock {
-	d.mutex.RLock()
-	defer d.mutex.RUnlock()
-
 	return d.clock
 }
 

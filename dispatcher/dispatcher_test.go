@@ -64,3 +64,17 @@ func Benchmark100Workers10Tasks(b *testing.B) {
 func Benchmark1000Workers1000Tasks(b *testing.B) {
 	runDispatcherByWorkersCountAndTasksCount(b, 1000, 1000)
 }
+
+func BenchmarkGettersSetters(b *testing.B) {
+	d := NewDispatcher()
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			d.setStatus(DispatcherStatusWait)
+
+			d.GetStatus()
+			d.GetClock()
+		}
+	})
+}
