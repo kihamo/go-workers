@@ -5,10 +5,11 @@ import (
 	"regexp"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"code.cloudfoundry.org/clock"
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 )
 
 const (
@@ -80,15 +81,15 @@ type Task struct {
 	fn         TaskFunction
 	args       []interface{}
 	id         string
-	name       string
-	duration   time.Duration
+	name       atomic.Value
+	duration   int64
 	repeats    int64
 	attempts   int64
 	status     int64
 	priority   int64
-	returns    interface{}
-	lastError  interface{}
-	timeout    time.Duration
+	returns    atomic.Value
+	lastError  atomic.Value
+	timeout    int64
 	createdAt  time.Time
 	startedAt  *time.Time
 	finishedAt *time.Time
@@ -99,24 +100,23 @@ func NewTask(f TaskFunction, a ...interface{}) *Task {
 }
 
 func NewTaskWithClock(c clock.Clock, f TaskFunction, a ...interface{}) *Task {
-	return &Task{
+	t := &Task{
 		fn:        f,
 		args:      a,
-		id:        uuid.New(),
+		id:        uuid.New().String(),
 		duration:  0,
 		repeats:   1,
 		attempts:  0,
 		status:    TaskStatusWait,
 		priority:  1,
 		timeout:   0,
-		createdAt: c.Now(),
+		createdAt: c.Now().UTC(),
 	}
+
+	return t
 }
 
 func (m *Task) GetFunction() TaskFunction {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	return m.fn
 }
 
@@ -141,139 +141,88 @@ func (m *Task) GetFunctionName() string {
 }
 
 func (m *Task) GetArguments() []interface{} {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.args
 }
 
 func (m *Task) GetId() string {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	return m.id
 }
 
 func (m *Task) GetName() string {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+	var n string
 
-	if m.name == "" {
+	if d := m.name.Load(); d != nil {
+		n = d.(string)
+	}
+
+	if n == "" {
 		return m.GetFunctionName()
 	}
 
-	return m.name
+	return n
 }
 
 func (m *Task) SetName(n string) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.name = n
+	m.name.Store(n)
 }
 
 func (m *Task) GetDuration() time.Duration {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.duration
+	return time.Duration(atomic.LoadInt64(&m.duration))
 }
 
 func (m *Task) SetDuration(d time.Duration) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.duration = d
+	atomic.StoreInt64(&m.duration, int64(d))
 }
 
 func (m *Task) GetRepeats() int64 {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.repeats
+	return atomic.LoadInt64(&m.repeats)
 }
 
 func (m *Task) SetRepeats(r int64) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.repeats = r
+	atomic.StoreInt64(&m.repeats, r)
 }
 
 func (m *Task) GetAttempts() int64 {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.attempts
+	return atomic.LoadInt64(&m.attempts)
 }
 
 func (m *Task) SetAttempts(a int64) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.attempts = a
+	atomic.StoreInt64(&m.attempts, a)
 }
 
 func (m *Task) GetStatus() int64 {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.status
+	return atomic.LoadInt64(&m.status)
 }
 
 func (m *Task) SetStatus(s int64) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.status = s
+	atomic.StoreInt64(&m.status, s)
 }
 
 func (m *Task) GetPriority() int64 {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.priority
+	return atomic.LoadInt64(&m.priority)
 }
 
 func (m *Task) SetPriority(p int64) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.priority = p
+	atomic.StoreInt64(&m.priority, p)
 }
 
 func (m *Task) GetReturns() interface{} {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	return m.returns
+	return m.returns.Load()
 }
 
 func (m *Task) SetReturns(r interface{}) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.returns = r
+	m.returns.Store(r)
 }
 
 func (m *Task) GetLastError() interface{} {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.lastError
+	return m.lastError.Load()
 }
 
 func (m *Task) SetLastError(e interface{}) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.lastError = e
+	m.lastError.Store(e)
 }
 
 func (m *Task) GetCreatedAt() time.Time {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
 	return m.createdAt
 }
 
@@ -310,15 +259,9 @@ func (m *Task) SetFinishedAt(t time.Time) {
 }
 
 func (m *Task) GetTimeout() time.Duration {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	return m.timeout
+	return time.Duration(atomic.LoadInt64(&m.timeout))
 }
 
 func (m *Task) SetTimeout(t time.Duration) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	m.timeout = t
+	atomic.StoreInt64(&m.timeout, int64(t))
 }

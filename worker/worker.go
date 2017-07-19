@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/clock"
+	"github.com/google/uuid"
 	"github.com/kihamo/go-workers/task"
-	"github.com/pborman/uuid"
 )
 
 const (
@@ -55,7 +55,7 @@ func NewWorkmanWithClock(d chan Worker, c clock.Clock) *Workman {
 	return &Workman{
 		clock: c,
 
-		id:        uuid.New(),
+		id:        uuid.New().String(),
 		status:    WorkerStatusWait,
 		createdAt: c.Now(),
 		kill:      make(chan bool, 1),

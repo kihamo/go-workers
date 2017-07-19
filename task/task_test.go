@@ -120,6 +120,21 @@ func (s *TaskSuite) Test_SetStatusFail_GetStatusReturnsStatusFail() {
 	assert.Equal(s.T(), t.GetStatus(), TaskStatusFail)
 }
 
+func (s *TaskSuite) Test_NewInstance_GetReturnsReturnsNil() {
+	t := NewTask(s.job)
+
+	assert.Nil(s.T(), t.GetReturns())
+}
+
+func (s *TaskSuite) Test_SetLastError_GetReturnReturnsTime() {
+	t := NewTask(s.job)
+	r := time.Now()
+
+	t.SetReturns(r)
+
+	assert.Equal(s.T(), t.GetReturns(), r)
+}
+
 func (s *TaskSuite) Test_NewInstance_GetLastErrorReturnsNil() {
 	t := NewTask(s.job)
 
@@ -138,7 +153,7 @@ func (s *TaskSuite) Test_SetLastError_GetLastErrorReturnsError() {
 func (s *TaskSuite) Test_NewInstance_GetCreatedAtReturnsTimeNow() {
 	t := NewTaskWithClock(fakeclock.NewFakeClock(s.clockTime), s.job)
 
-	assert.Equal(s.T(), t.GetCreatedAt(), s.clockTime)
+	assert.Equal(s.T(), t.GetCreatedAt(), s.clockTime.UTC())
 }
 
 func (s *TaskSuite) Test_NewInstance_GetFinishedAtReturnsNil() {
@@ -181,4 +196,46 @@ func (s *TaskSuite) Test_SetTimeoutFiveSecond_GetTimeoutReturnsFiveSecond() {
 	t.SetTimeout(time.Duration(time.Second * 5))
 
 	assert.Equal(s.T(), t.GetTimeout(), time.Second*5)
+}
+
+func BenchmarkGettersSetters(b *testing.B) {
+	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+		return 0, 0, nil, nil
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			t := NewTask(f)
+
+			t.SetAttempts(1)
+			t.SetDuration(time.Second)
+			t.SetFinishedAt(time.Now())
+			t.SetLastError(errors.New("Failed"))
+			t.SetName("task")
+			t.SetPriority(2)
+			t.SetRepeats(3)
+			t.SetReturns([]int64{1, 2, 3})
+			t.SetStartedAt(time.Now())
+			t.SetStatus(TaskStatusFail)
+			t.SetTimeout(time.Hour)
+
+			t.GetFunction()
+			t.GetFunctionName()
+			t.GetArguments()
+			t.GetId()
+			t.GetName()
+			t.GetDuration()
+			t.GetRepeats()
+			t.GetAttempts()
+			t.GetStatus()
+			t.GetPriority()
+			t.GetReturns()
+			t.GetLastError()
+			t.GetTimeout()
+			t.GetCreatedAt()
+			t.GetStartedAt()
+			t.GetFinishedAt()
+		}
+	})
 }
