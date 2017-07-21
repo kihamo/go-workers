@@ -98,20 +98,20 @@ func (q *Tasks) Add(t task.Tasker) {
 		e: &element,
 	}
 
-	if element.lastStatus == task.TaskStatusWait || element.lastStatus == task.TaskStatusRepeatWait {
-		atomic.AddInt64(&q.wait, 1)
-	}
-
 	q.mutex.Lock()
 	q.itemsByHash[element.hash] = item
 	heap.Push(q.queue, element)
 	q.mutex.Unlock()
 
+	if element.lastStatus == task.TaskStatusWait || element.lastStatus == task.TaskStatusRepeatWait {
+		atomic.AddInt64(&q.wait, 1)
+	}
+
 	atomic.AddInt64(&q.length, 1)
 }
 
 func (q *Tasks) GetWait() (t task.Tasker) {
-	if atomic.LoadInt64(&q.wait) == 0 {
+	if !q.HasWait() {
 		return nil
 	}
 
@@ -128,10 +128,10 @@ func (q *Tasks) GetWait() (t task.Tasker) {
 		}
 
 		atomic.AddInt64(&q.wait, -1)
-		t = q.itemsByHash[element.hash].t
-
-		delete(q.itemsByHash, element.hash)
 		atomic.AddInt64(&q.length, -1)
+
+		t = q.itemsByHash[element.hash].t
+		delete(q.itemsByHash, element.hash)
 
 		return t
 	}
@@ -155,8 +155,9 @@ func (q *Tasks) RemoveById(id string) {
 			atomic.AddInt64(&q.wait, -1)
 		}
 
-		delete(q.itemsByHash, hash)
 		atomic.AddInt64(&q.length, -1)
+
+		delete(q.itemsByHash, hash)
 	}
 }
 

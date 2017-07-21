@@ -10,7 +10,7 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		quit := make(chan bool, 1)
+		quit := make(chan struct{}, 1)
 
 		listener := NewDefaultListener("test-d")
 
@@ -20,8 +20,6 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 		for w := 1; w <= workersCount; w++ {
 			d.AddWorker()
 		}
-
-		go d.Run()
 
 		go func() {
 			finished := 0
@@ -33,16 +31,18 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 
 					if finished == tasksCount {
 						d.Kill()
-						quit <- true
+						quit <- struct{}{}
 					}
 				}
 			}
 		}()
 
+		go d.Run()
+
 		for d.GetStatus() != DispatcherStatusProcess {
 		}
 
-		f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+		f := func(_ int64, _ chan struct{}, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 			return 0, 0, nil, nil
 		}
 
@@ -53,6 +53,7 @@ func runDispatcherByWorkersCountAndTasksCount(b *testing.B, workersCount int, ta
 		}
 
 		<-quit
+
 		b.StopTimer()
 	}
 }
@@ -83,7 +84,7 @@ func BenchmarkAddTasks(b *testing.B) {
 	d := NewDispatcher()
 	go d.Run()
 
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+	f := func(_ int64, _ chan struct{}, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 		return 0, 0, nil, nil
 	}
 

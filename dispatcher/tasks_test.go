@@ -16,7 +16,7 @@ func TestTasksSuite(t *testing.T) {
 	suite.Run(t, new(TasksSuite))
 }
 
-func (s *TasksSuite) jobNothing(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+func (s *TasksSuite) jobNothing(_ int64, _ chan struct{}, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 	return 0, 0, nil, nil
 }
 
@@ -223,7 +223,7 @@ func (s *TasksSuite) Test_CreateNewInstanceAndAddRepeatWaitTask_ReturnsFalseForH
 func BenchmarkAdd(b *testing.B) {
 	c := NewTasks()
 
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+	f := func(_ int64, _ chan struct{}, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 		return 0, 0, nil, nil
 	}
 
@@ -238,7 +238,7 @@ func BenchmarkAdd(b *testing.B) {
 func BenchmarkAddAndMix(b *testing.B) {
 	c := NewTasks()
 
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+	f := func(_ int64, _ chan struct{}, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 		return 0, 0, nil, nil
 	}
 

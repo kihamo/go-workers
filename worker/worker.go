@@ -39,12 +39,12 @@ type Workman struct {
 	createdAt time.Time
 
 	changeStatus atomic.Value
-	kill         chan bool
+	kill         chan struct{}
 	done         chan Worker
 
 	task     atomic.Value
 	newTask  chan task.Tasker
-	killTask chan bool
+	killTask chan struct{}
 }
 
 func NewWorkman(d chan Worker) *Workman {
@@ -58,11 +58,11 @@ func NewWorkmanWithClock(d chan Worker, c clock.Clock) *Workman {
 		id:        uuid.New().String(),
 		status:    WorkerStatusWait,
 		createdAt: c.Now(),
-		kill:      make(chan bool, 1),
+		kill:      make(chan struct{}, 1),
 		done:      d,
 
 		newTask:  make(chan task.Tasker, 1),
-		killTask: make(chan bool, 1),
+		killTask: make(chan struct{}, 1),
 	}
 }
 
@@ -89,7 +89,7 @@ func (m *Workman) Run() error {
 
 		case <-m.kill:
 			if m.GetStatus() == WorkerStatusBusy {
-				m.killTask <- true
+				m.killTask <- struct{}{}
 			}
 
 			m.wg.Wait()
@@ -116,14 +116,14 @@ func (m *Workman) processTask() {
 	m.executeTask()
 
 	m.setStatus(WorkerStatusWait)
-	m.kill <- true
+	m.kill <- struct{}{}
 }
 
 func (m *Workman) executeTask() {
 	t := m.GetTask()
 	resultChan := make(chan []interface{}, 1)
 	errorChan := make(chan interface{}, 1)
-	quitChan := make(chan bool, 1)
+	quitChan := make(chan struct{}, 1)
 
 	m.wg.Add(1)
 	go func() {
@@ -175,12 +175,12 @@ func (m *Workman) executeTask() {
 			case <-m.killTask:
 				timer.Stop()
 
-				quitChan <- true
+				quitChan <- struct{}{}
 				t.SetStatus(task.TaskStatusKill)
 				return
 
 			case <-timer.C():
-				quitChan <- true
+				quitChan <- struct{}{}
 				t.SetStatus(task.TaskStatusFailByTimeout)
 				return
 			}
@@ -206,7 +206,7 @@ func (m *Workman) executeTask() {
 				return
 
 			case <-m.killTask:
-				quitChan <- true
+				quitChan <- struct{}{}
 				t.SetStatus(task.TaskStatusKill)
 				return
 			}
@@ -216,7 +216,7 @@ func (m *Workman) executeTask() {
 
 func (m *Workman) Kill() error {
 	if m.GetStatus() != WorkerStatusWait {
-		m.kill <- true
+		m.kill <- struct{}{}
 		return nil
 	}
 
@@ -225,7 +225,7 @@ func (m *Workman) Kill() error {
 
 func (m *Workman) Reset() {
 	if m.GetStatus() == WorkerStatusBusy {
-		m.killTask <- true
+		m.killTask <- struct{}{}
 	}
 
 	m.setTask(nil)

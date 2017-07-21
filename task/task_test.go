@@ -24,7 +24,7 @@ func (s *TaskSuite) SetupSuite() {
 	s.clockTime = time.Date(2016, 6, 5, 4, 3, 2, 1, time.UTC)
 }
 
-func (s *TaskSuite) job(attempts int64, quit chan bool, args ...interface{}) (int64, time.Duration, interface{}, error) {
+func (s *TaskSuite) job(attempts int64, quit chan struct{}, args ...interface{}) (int64, time.Duration, interface{}, error) {
 	return 1, time.Second, nil, nil
 }
 
@@ -199,7 +199,7 @@ func (s *TaskSuite) Test_SetTimeoutFiveSecond_GetTimeoutReturnsFiveSecond() {
 }
 
 func BenchmarkGettersSetters(b *testing.B) {
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+	f := func(_ int64, _ chan struct{}, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 		return 0, 0, nil, nil
 	}
 	t := NewTask(f)

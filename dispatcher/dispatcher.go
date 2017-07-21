@@ -30,17 +30,17 @@ type Dispatcher struct {
 	listenersTasks *ListenerTasks
 
 	doneWorker       chan worker.Worker // канал уведомления о завершении рабочего
-	quitDoWorkerDone chan bool
+	quitDoWorkerDone chan struct{}
 
-	allowExecuteTasks    chan bool // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
-	quitDoExecuteTasks   chan bool
+	allowExecuteTasks    chan struct{} // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
+	quitDoExecuteTasks   chan struct{}
 	tickerDoExecuteTasks *workers.Ticker
 
-	allowNotifyListeners    chan bool
-	quitDoNotifyListeners   chan bool
+	allowNotifyListeners    chan struct{}
+	quitDoNotifyListeners   chan struct{}
 	tickerDoNotifyListeners *workers.Ticker
 
-	quitDispatcher chan bool
+	quitDispatcher chan struct{}
 }
 
 func NewDispatcher() *Dispatcher {
@@ -59,17 +59,17 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 		listenersTasks: NewListenerTasks(),
 
 		doneWorker:       make(chan worker.Worker),
-		quitDoWorkerDone: make(chan bool, 1),
+		quitDoWorkerDone: make(chan struct{}, 1),
 
-		allowExecuteTasks:    make(chan bool, 1),
-		quitDoExecuteTasks:   make(chan bool, 1),
+		allowExecuteTasks:    make(chan struct{}, 1),
+		quitDoExecuteTasks:   make(chan struct{}, 1),
 		tickerDoExecuteTasks: workers.NewTicker(time.Second),
 
-		allowNotifyListeners:    make(chan bool, 1),
-		quitDoNotifyListeners:   make(chan bool, 1),
+		allowNotifyListeners:    make(chan struct{}, 1),
+		quitDoNotifyListeners:   make(chan struct{}, 1),
 		tickerDoNotifyListeners: workers.NewTicker(time.Second),
 
-		quitDispatcher: make(chan bool, 1),
+		quitDispatcher: make(chan struct{}, 1),
 	}
 }
 
@@ -92,9 +92,9 @@ func (d *Dispatcher) Run() error {
 	for {
 		select {
 		case <-d.quitDispatcher:
-			d.quitDoExecuteTasks <- true
-			d.quitDoWorkerDone <- true
-			d.quitDoNotifyListeners <- true
+			d.quitDoExecuteTasks <- struct{}{}
+			d.quitDoWorkerDone <- struct{}{}
+			d.quitDoNotifyListeners <- struct{}{}
 
 			d.wg.Wait()
 			d.setStatus(DispatcherStatusWait)
@@ -188,7 +188,7 @@ func (d *Dispatcher) doExecuteTasks() {
 
 func (d *Dispatcher) notifyAllowExecuteTasks() {
 	if d.GetStatus() == DispatcherStatusProcess && len(d.allowExecuteTasks) == 0 {
-		d.allowExecuteTasks <- true
+		d.allowExecuteTasks <- struct{}{}
 	}
 }
 
@@ -244,7 +244,7 @@ func (d *Dispatcher) addNotifyListeners(t task.Tasker) {
 
 func (d *Dispatcher) notifyAllowNotifyListeners() {
 	if len(d.allowNotifyListeners) == 0 {
-		d.allowNotifyListeners <- true
+		d.allowNotifyListeners <- struct{}{}
 	}
 }
 
@@ -362,7 +362,7 @@ func (d *Dispatcher) Reset() {
 
 func (d *Dispatcher) Kill() error {
 	if d.GetStatus() == DispatcherStatusProcess {
-		d.quitDispatcher <- true
+		d.quitDispatcher <- struct{}{}
 		return nil
 	}
 

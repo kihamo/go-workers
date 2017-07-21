@@ -73,7 +73,7 @@ type Tasker interface {
 	SetFinishedAt(time.Time)
 }
 
-type TaskFunction func(int64, chan bool, ...interface{}) (int64, time.Duration, interface{}, error)
+type TaskFunction func(int64, chan struct{}, ...interface{}) (int64, time.Duration, interface{}, error)
 
 type Task struct {
 	fn         TaskFunction
