@@ -78,3 +78,31 @@ func BenchmarkGettersSetters(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkAddTasks(b *testing.B) {
+	d := NewDispatcher()
+	go d.Run()
+
+	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
+		return 0, 0, nil, nil
+	}
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			d.AddNamedTaskByFunc("new-task", f)
+		}
+	})
+}
+
+func BenchmarkAddWorkers(b *testing.B) {
+	d := NewDispatcher()
+	go d.Run()
+
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			d.AddWorker()
+		}
+	})
+}

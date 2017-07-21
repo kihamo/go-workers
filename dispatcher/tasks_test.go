@@ -220,77 +220,39 @@ func (s *TasksSuite) Test_CreateNewInstanceAndAddRepeatWaitTask_ReturnsFalseForH
 	s.True(q.HasWait())
 }
 
-func BenchmarkAddAndGet(b *testing.B) {
+func BenchmarkAdd(b *testing.B) {
 	c := NewTasks()
 
 	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 		return 0, 0, nil, nil
 	}
 
-	tasks := []task.Tasker{}
-	for i := 0; i < b.N; i++ {
-		tasks = append(tasks, task.NewTask(f))
-	}
-
-	b.StopTimer()
-	b.ResetTimer()
-	b.StartTimer()
-
-	for i := 0; i < b.N; i++ {
-		c.Add(tasks[i])
-	}
-
-	for i := 0; i < b.N; i++ {
-		c.GetWait()
-	}
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			c.Add(task.NewTask(f))
+		}
+	})
 }
 
-func BenchmarkAddAndRemove(b *testing.B) {
+func BenchmarkAddAndMix(b *testing.B) {
 	c := NewTasks()
 
 	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
 		return 0, 0, nil, nil
 	}
 
-	tasks := []task.Tasker{}
-	for i := 0; i < b.N; i++ {
-		tasks = append(tasks, task.NewTask(f))
-	}
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			t := task.NewTask(f)
+			c.Add(t)
+			c.Len()
+			c.Remove(t)
 
-	b.StopTimer()
-	b.ResetTimer()
-	b.StartTimer()
-
-	for i := 0; i < b.N; i++ {
-		c.Add(tasks[i])
-	}
-
-	for i := 0; i < b.N; i++ {
-		c.Remove(tasks[i])
-	}
-}
-
-func BenchmarkAddAndRemoveById(b *testing.B) {
-	c := NewTasks()
-
-	f := func(_ int64, _ chan bool, _ ...interface{}) (int64, time.Duration, interface{}, error) {
-		return 0, 0, nil, nil
-	}
-
-	tasks := []task.Tasker{}
-	for i := 0; i < b.N; i++ {
-		tasks = append(tasks, task.NewTask(f))
-	}
-
-	b.StopTimer()
-	b.ResetTimer()
-	b.StartTimer()
-
-	for i := 0; i < b.N; i++ {
-		c.Add(tasks[i])
-	}
-
-	for i := 0; i < b.N; i++ {
-		c.RemoveById(tasks[i].GetId())
-	}
+			c.Add(t)
+			c.HasWait()
+			c.GetWait()
+		}
+	})
 }
