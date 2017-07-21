@@ -93,14 +93,12 @@ func (q *Tasks) Add(t task.Tasker) {
 		hash:       q.getHash(t.GetId()),
 	}
 
-	item := tasksItem{
+	q.mutex.Lock()
+	heap.Push(q.queue, element)
+	q.itemsByHash[element.hash] = tasksItem{
 		t: t,
 		e: &element,
 	}
-
-	q.mutex.Lock()
-	q.itemsByHash[element.hash] = item
-	heap.Push(q.queue, element)
 	q.mutex.Unlock()
 
 	if element.lastStatus == task.TaskStatusWait || element.lastStatus == task.TaskStatusRepeatWait {

@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"container/list"
 	"sync"
+	"sync/atomic"
 
 	"github.com/kihamo/go-workers/worker"
 )
@@ -16,7 +17,7 @@ type Workers struct {
 	mutex     sync.RWMutex
 	container *list.List
 
-	wait  int
+	wait  int64
 	items map[string]*workersItem
 }
 
@@ -42,7 +43,7 @@ func (q *Workers) Add(w worker.Worker) {
 	var e *list.Element
 	if w.GetStatus() == worker.WorkerStatusWait {
 		e = q.container.PushFront(w)
-		q.wait++
+		atomic.AddInt64(&q.wait, 1)
 	} else {
 		e = q.container.PushBack(w)
 	}
@@ -61,7 +62,7 @@ func (q *Workers) Remove(w worker.Worker) {
 		q.container.Remove(item.element)
 
 		if item.lastStatus == worker.WorkerStatusWait {
-			q.wait--
+			atomic.AddInt64(&q.wait, -1)
 		}
 
 		delete(q.items, w.GetId())
@@ -69,12 +70,12 @@ func (q *Workers) Remove(w worker.Worker) {
 }
 
 func (q *Workers) GetWait() (w worker.Worker) {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
-	if q.wait == 0 {
+	if !q.HasWait() {
 		return nil
 	}
+
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
 
 	for e := q.container.Front(); e != nil; e = e.Next() {
 		w = e.Value.(worker.Worker)
@@ -83,7 +84,7 @@ func (q *Workers) GetWait() (w worker.Worker) {
 			q.container.Remove(e)
 
 			if q.items[w.GetId()].lastStatus == worker.WorkerStatusWait {
-				q.wait--
+				atomic.AddInt64(&q.wait, -1)
 			}
 
 			delete(q.items, w.GetId())
@@ -105,13 +106,13 @@ func (q *Workers) Update(w worker.Worker) {
 			q.container.MoveToFront(item.element)
 
 			if item.lastStatus != worker.WorkerStatusWait {
-				q.wait++
+				atomic.AddInt64(&q.wait, 1)
 			}
 		} else {
 			q.container.MoveToBack(item.element)
 
 			if item.lastStatus == worker.WorkerStatusWait {
-				q.wait--
+				atomic.AddInt64(&q.wait, -1)
 			}
 		}
 
@@ -120,10 +121,7 @@ func (q *Workers) Update(w worker.Worker) {
 }
 
 func (q *Workers) HasWait() bool {
-	q.mutex.RLock()
-	defer q.mutex.RUnlock()
-
-	return q.wait > 0
+	return atomic.LoadInt64(&q.wait) > 0
 }
 
 func (q *Workers) GetItems() []worker.Worker {
