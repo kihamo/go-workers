@@ -71,9 +71,15 @@ func (m *Workman) Run() error {
 		return errors.New("Worker is running")
 	}
 
+	// TODO: refactoring
+	var isKillSignal bool
+
 	defer func() {
+		if !isKillSignal {
+			m.done <- m
+		}
+
 		m.setStatus(WorkerStatusWait)
-		m.done <- m
 	}()
 
 	m.setStatus(WorkerStatusProcess)
@@ -93,6 +99,7 @@ func (m *Workman) Run() error {
 			}
 
 			m.wg.Wait()
+			isKillSignal = true
 			return nil
 		}
 	}

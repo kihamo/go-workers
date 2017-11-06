@@ -2,9 +2,11 @@ package dispatcher
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
+	"context"
 
 	"code.cloudfoundry.org/clock"
 	"github.com/kihamo/go-workers"
@@ -15,12 +17,16 @@ import (
 const (
 	DispatcherStatusWait = int64(iota)
 	DispatcherStatusProcess
+	DispatcherStatusCancel
 )
 
 type Dispatcher struct {
 	mutex sync.RWMutex
 	wg    sync.WaitGroup
 	clock clock.Clock
+
+	ctx context.Context
+	cancel context.CancelFunc
 
 	workers *Workers
 	tasks   *Tasks
@@ -30,17 +36,12 @@ type Dispatcher struct {
 	listenersTasks *ListenerTasks
 
 	doneWorker       chan worker.Worker // канал уведомления о завершении рабочего
-	quitDoWorkerDone chan struct{}
 
 	allowExecuteTasks    chan struct{} // канал для блокировки выполнения новых задач для случая, когда все исполнители заняты
-	quitDoExecuteTasks   chan struct{}
 	tickerDoExecuteTasks *workers.Ticker
 
 	allowNotifyListeners    chan struct{}
-	quitDoNotifyListeners   chan struct{}
 	tickerDoNotifyListeners *workers.Ticker
-
-	quitDispatcher chan struct{}
 }
 
 func NewDispatcher() *Dispatcher {
@@ -48,7 +49,7 @@ func NewDispatcher() *Dispatcher {
 }
 
 func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
-	return &Dispatcher{
+	d := &Dispatcher{
 		clock: c,
 
 		workers: NewWorkers(),
@@ -59,18 +60,17 @@ func NewDispatcherWithClock(c clock.Clock) *Dispatcher {
 		listenersTasks: NewListenerTasks(),
 
 		doneWorker:       make(chan worker.Worker),
-		quitDoWorkerDone: make(chan struct{}, 1),
 
 		allowExecuteTasks:    make(chan struct{}, 1),
-		quitDoExecuteTasks:   make(chan struct{}, 1),
 		tickerDoExecuteTasks: workers.NewTicker(time.Second),
 
 		allowNotifyListeners:    make(chan struct{}, 1),
-		quitDoNotifyListeners:   make(chan struct{}, 1),
 		tickerDoNotifyListeners: workers.NewTicker(time.Second),
-
-		quitDispatcher: make(chan struct{}, 1),
 	}
+
+	d.ctx, d.cancel = context.WithCancel(context.Background())
+
+	return d
 }
 
 func (d *Dispatcher) Run() error {
@@ -89,18 +89,14 @@ func (d *Dispatcher) Run() error {
 
 	d.setStatus(DispatcherStatusProcess)
 
-	for {
-		select {
-		case <-d.quitDispatcher:
-			d.quitDoExecuteTasks <- struct{}{}
-			d.quitDoWorkerDone <- struct{}{}
-			d.quitDoNotifyListeners <- struct{}{}
+	<-d.ctx.Done()
 
-			d.wg.Wait()
-			d.setStatus(DispatcherStatusWait)
-			return nil
-		}
-	}
+	d.setStatus(DispatcherStatusCancel)
+
+	d.wg.Wait()
+	d.setStatus(DispatcherStatusWait)
+
+	return nil
 }
 
 // Обработчик сигналов завершения работы от воркеров. Перезапускает задачи, требующего повторения.
@@ -125,7 +121,11 @@ func (d *Dispatcher) doWorkerDone() {
 				go d.notifyAllowExecuteTasks()
 			}
 
-		case <-d.quitDoWorkerDone:
+		case <-d.ctx.Done():
+			for _, w := range d.getSafeWorkers().GetItems() {
+				w.Kill()
+			}
+
 			return
 		}
 	}
@@ -139,7 +139,7 @@ func (d *Dispatcher) doExecuteTasks() {
 
 	for {
 		select {
-		case <-d.quitDoExecuteTasks:
+		case <-d.ctx.Done():
 			d.tickerDoExecuteTasks.Stop()
 			return
 
@@ -199,7 +199,7 @@ func (d *Dispatcher) doNotifyListeners() {
 
 	for {
 		select {
-		case <-d.quitDoNotifyListeners:
+		case <-d.ctx.Done():
 			d.tickerDoNotifyListeners.Stop()
 			return
 
@@ -218,14 +218,19 @@ func (d *Dispatcher) doNotifyListeners() {
 						done := make(chan struct{}, 1)
 
 						go func() {
-							l.NotifyTaskDone(t)
+							if err := l.NotifyTaskDone(t); err != nil {
+								log.Printf("Notify listener %s about task done returns error %s", l.GetName(), err.Error())
+							}
+
 							done <- struct{}{}
 						}()
 
 						select {
 						case <-done:
 						case <-time.After(time.Second):
-							l.NotifyTaskDoneTimeout(t)
+							if err := l.NotifyTaskDoneTimeout(t); err != nil {
+								log.Printf("Notify listener with timout %s about task done returns error %s", l.GetName(), err.Error())
+							}
 						}
 					}
 				}
@@ -361,12 +366,8 @@ func (d *Dispatcher) Reset() {
 }
 
 func (d *Dispatcher) Kill() error {
-	if d.GetStatus() == DispatcherStatusProcess {
-		d.quitDispatcher <- struct{}{}
-		return nil
-	}
-
-	return errors.New("Dispatcher isn't running")
+	d.cancel()
+	return d.ctx.Err()
 }
 
 func (d *Dispatcher) GetStatus() int64 {
