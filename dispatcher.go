@@ -7,7 +7,8 @@ import (
 type DispatcherStatus int64
 
 const (
-	DispatcherStatusWait DispatcherStatus = iota
+	DispatcherStatusUndefined DispatcherStatus = iota
+	DispatcherStatusWait
 	DispatcherStatusProcess
 	DispatcherStatusCancel
 )
@@ -29,14 +30,14 @@ type Dispatcher interface {
 	AddWorker(Worker) error
 	RemoveWorker(Worker)
 	GetWorkers() []Worker
+	GetWorkerStatus(string) Status
 
 	AddTask(Task) error
 	RemoveTask(Task)
 	GetTasks() []Task
+	GetTaskStatus(string) Status
 
-	/*
-		AddListener(Listener)
-		RemoveListener(Listener)
-		GetListeners() []Listener
-	*/
+	AddListener(EventId, Listener)
+	RemoveListener(EventId, Listener)
+	GetListeners() map[EventId][]Listener
 }

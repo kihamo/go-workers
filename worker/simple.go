@@ -20,6 +20,12 @@ func NewSimpleWorker() *SimpleWorker {
 	}
 }
 
+func (w *SimpleWorker) Cancel() error {
+	// FIXME:
+
+	return nil
+}
+
 func (w *SimpleWorker) RunTask(ctx context.Context, task workers.Task) (interface{}, error) {
 	return task.Run(ctx)
 }

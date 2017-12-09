@@ -1,6 +1,5 @@
 .idea
 *.iml
-.gitignore
 *out
 *.test
 old

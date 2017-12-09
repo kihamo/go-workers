@@ -1,23 +1,7 @@
 package workers
 
-type Listener interface {
-	GetName() string
+import (
+	"time"
+)
 
-	NotifyDispatcherStart() error
-	NotifyDispatcherDone() error
-	NotifyDispatcherChangeStatus(Task) error
-	NotifyDispatcherRegisteredWorker() error
-	NotifyDispatcherUnregisteredWorker() error
-	NotifyDispatcherRegisteredTask() error
-	NotifyDispatcherUnregisteredTask() error
-
-	NotifyWorkerStart(Worker) error
-	NotifyWorkerDone(Worker) error
-	NotifyWorkerChangeStatus(Worker) error
-	NotifyWorkerDoneTask(Worker) error
-
-	NotifyTaskStart() error
-	NotifyTaskDone(Task) error
-	NotifyTaskDoneByTimeout(Task) error
-	NotifyTaskChangeStatus(Task) error
-}
+type Listener func(time.Time, ...interface{})

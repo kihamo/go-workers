@@ -8,7 +8,8 @@ import (
 type WorkerStatus int64
 
 const (
-	WorkerStatusWait WorkerStatus = iota
+	WorkerStatusUndefined WorkerStatus = iota
+	WorkerStatusWait
 	WorkerStatusProcess
 	WorkerStatusCancel
 )
@@ -22,6 +23,7 @@ func (i WorkerStatus) Int64() int64 {
 }
 
 type Worker interface {
+	Cancel() error
 	RunTask(context.Context, Task) (interface{}, error)
 	Id() string
 	CreatedAt() time.Time

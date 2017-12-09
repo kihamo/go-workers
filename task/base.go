@@ -22,6 +22,12 @@ func (t *BaseTask) Init() {
 	t.createdAt = time.Now()
 }
 
+func (t *BaseTask) Cancel() error {
+	// FIXME:
+
+	return nil
+}
+
 func (t *BaseTask) Id() string {
 	return t.id
 }

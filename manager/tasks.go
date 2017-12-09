@@ -76,6 +76,16 @@ func (m *TasksManager) Remove(item workers.ManagerItem) {
 	t.setIndex(-1)
 }
 
+func (m *TasksManager) GetById(id string) workers.ManagerItem {
+	for _, t := range m.queue.All() {
+		if t.Id() == id {
+			return t
+		}
+	}
+
+	return nil
+}
+
 func (m *TasksManager) GetAll() []workers.ManagerItem {
 	all := m.queue.All()
 	collection := make([]workers.ManagerItem, 0, len(all))

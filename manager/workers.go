@@ -104,6 +104,17 @@ func (m *WorkersManager) Remove(item workers.ManagerItem) {
 	m.mutex.Unlock()
 }
 
+func (m *WorkersManager) GetById(id string) workers.ManagerItem {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	if w, ok := m.workers[id]; ok {
+		return w
+	}
+
+	return nil
+}
+
 func (m *WorkersManager) GetAll() []workers.ManagerItem {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()

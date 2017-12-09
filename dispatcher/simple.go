@@ -25,6 +25,7 @@ type SimpleDispatcher struct {
 
 	workers workers.Manager
 	tasks   workers.Manager
+	events  workers.EventsManager
 
 	allowExecuteTasks chan struct{}
 	results           chan SimpleDispatcherResult
@@ -38,9 +39,12 @@ func NewSimpleDispatcherWithContext(ctx context.Context) *SimpleDispatcher {
 	d := &SimpleDispatcher{
 		workers:           manager.NewWorkersManager(),
 		tasks:             manager.NewTasksManager(),
+		events:            manager.NewEventsManager(),
 		allowExecuteTasks: make(chan struct{}, 1),
 		results:           make(chan SimpleDispatcherResult),
 	}
+
+	d.setStatusDispatcher(workers.DispatcherStatusWait)
 
 	d.ctx, d.ctxCancel = context.WithCancel(ctx)
 	return d
@@ -55,16 +59,24 @@ func (d *SimpleDispatcher) Run() error {
 		return errors.New("Dispatcher is running")
 	}
 
-	d.StatusItemBase.SetStatus(workers.DispatcherStatusProcess)
+	d.setStatusDispatcher(workers.DispatcherStatusProcess)
 
 	go d.doResultCollector()
 	go d.doDispatch()
 
 	<-d.ctx.Done()
-	d.StatusItemBase.SetStatus(workers.DispatcherStatusCancel)
+	d.setStatusDispatcher(workers.DispatcherStatusCancel)
+
+	for _, w := range d.workers.GetAll() {
+		d.setStatusWorker(w, workers.WorkerStatusCancel)
+	}
+
+	for _, t := range d.tasks.GetAll() {
+		d.setStatusTask(t, workers.WorkerStatusCancel)
+	}
 
 	d.wg.Wait()
-	d.StatusItemBase.SetStatus(workers.DispatcherStatusWait)
+	d.setStatusDispatcher(workers.DispatcherStatusWait)
 
 	return nil
 }
@@ -88,16 +100,36 @@ func (d *SimpleDispatcher) AddWorker(worker workers.Worker) error {
 		return err
 	}
 
+	d.events.AsyncTrigger(workers.EventIdWorkerAdd, worker)
 	d.notifyAllowExecuteTasks()
 	return nil
 }
 
 func (d *SimpleDispatcher) RemoveWorker(worker workers.Worker) {
-	for _, item := range d.workers.GetAll() {
-		if item.Id() == worker.Id() {
-			d.workers.Remove(item)
+	item := d.workers.GetById(worker.Id())
+	if item != nil {
+		cancel := item.IsStatus(workers.WorkerStatusProcess)
+		d.setStatusWorker(item, workers.WorkerStatusCancel)
+
+		if cancel {
+			worker.Cancel()
 		}
+
+		d.workers.Remove(item)
+		d.events.AsyncTrigger(workers.EventIdWorkerRemove, item.(*manager.WorkersManagerItem).Worker())
 	}
+
+	return
+}
+
+func (d *SimpleDispatcher) GetWorkerStatus(id string) workers.Status {
+	item := d.workers.GetById(id)
+
+	if item != nil {
+		return item.Status()
+	}
+
+	return nil
 }
 
 func (d *SimpleDispatcher) GetWorkers() []workers.Worker {
@@ -117,18 +149,36 @@ func (d *SimpleDispatcher) AddTask(task workers.Task) error {
 		return err
 	}
 
+	d.events.AsyncTrigger(workers.EventIdTaskAdd, task)
 	d.notifyAllowExecuteTasks()
 	return nil
 }
 
 func (d *SimpleDispatcher) RemoveTask(task workers.Task) {
-	for _, item := range d.tasks.GetAll() {
-		if item.Id() == task.Id() {
-			d.tasks.Remove(item)
+	item := d.tasks.GetById(task.Id())
+	if item != nil {
+		cancel := item.IsStatus(workers.TaskStatusProcess) || item.IsStatus(workers.TaskStatusRepeatWait)
+		d.setStatusTask(item, workers.TaskStatusCancel)
+
+		if cancel {
+			task.Cancel()
 		}
+
+		d.tasks.Remove(item)
+		d.events.AsyncTrigger(workers.EventIdTaskRemove, item.(*manager.TasksManagerItem).Task())
 	}
 
 	return
+}
+
+func (d *SimpleDispatcher) GetTaskStatus(id string) workers.Status {
+	item := d.tasks.GetById(id)
+
+	if item != nil {
+		return item.Status()
+	}
+
+	return nil
 }
 
 func (d *SimpleDispatcher) GetTasks() []workers.Task {
@@ -142,28 +192,45 @@ func (d *SimpleDispatcher) GetTasks() []workers.Task {
 	return collection
 }
 
+func (d *SimpleDispatcher) AddListener(id workers.EventId, listener workers.Listener) {
+	d.events.Attach(id, listener)
+}
+
+func (d *SimpleDispatcher) RemoveListener(id workers.EventId, listener workers.Listener) {
+	d.events.DeAttach(id, listener)
+}
+
+func (d *SimpleDispatcher) GetListeners() map[workers.EventId][]workers.Listener {
+	return d.events.Listeners()
+}
+
 func (d *SimpleDispatcher) doResultCollector() {
 	d.wg.Add(1)
 
 	for {
 		select {
 		case result := <-d.results:
+			if d.IsStatus(workers.DispatcherStatusCancel) {
+				continue
+			}
+
 			d.tasks.Remove(result.taskItem)
 
-			result.workerItem.SetStatus(workers.WorkerStatusWait)
+			d.setStatusWorker(result.workerItem, workers.WorkerStatusWait)
 			d.workers.Push(result.workerItem)
 
 			if result.err != nil {
-				result.taskItem.SetStatus(workers.TaskStatusFail)
+				d.setStatusTask(result.taskItem, workers.TaskStatusFail)
 			} else {
-				result.taskItem.SetStatus(workers.TaskStatusSuccess)
+				d.setStatusTask(result.taskItem, workers.TaskStatusSuccess)
 			}
 
 			if repeats := result.taskItem.Task().Repeats(); repeats == -1 || result.taskItem.Attempts() < repeats {
-				result.taskItem.SetStatus(workers.TaskStatusRepeatWait)
+				d.setStatusTask(result.taskItem, workers.TaskStatusRepeatWait)
 				d.tasks.Push(result.taskItem)
 			}
 
+			d.events.AsyncTrigger(workers.EventIdTaskExecuteStop, result.taskItem.Task(), result.workerItem)
 			d.notifyAllowExecuteTasks()
 
 		case <-d.ctx.Done():
@@ -179,15 +246,23 @@ func (d *SimpleDispatcher) doDispatch() {
 	for {
 		select {
 		case <-d.allowExecuteTasks:
+			if d.IsStatus(workers.DispatcherStatusCancel) {
+				continue
+			}
+
 			if d.tasks.Check() && d.workers.Check() {
 				pullWorker := d.workers.Pull()
 				pullTask := d.tasks.Pull()
 
 				if pullWorker != nil && pullTask != nil {
-					pullWorker.SetStatus(workers.WorkerStatusProcess)
-					pullTask.SetStatus(workers.TaskStatusProcess)
+					d.setStatusWorker(pullWorker, workers.WorkerStatusProcess)
+					d.setStatusTask(pullTask, workers.TaskStatusProcess)
 
-					go d.doRunTask(pullWorker.(*manager.WorkersManagerItem), pullTask.(*manager.TasksManagerItem))
+					castWorker := pullWorker.(*manager.WorkersManagerItem)
+					castTask := pullTask.(*manager.TasksManagerItem)
+
+					d.events.AsyncTrigger(workers.EventIdTaskExecuteStart, castTask.Task(), castWorker.Worker())
+					go d.doRunTask(castWorker, castTask)
 				}
 				// TODO: log else
 			}
@@ -263,4 +338,22 @@ func (d *SimpleDispatcher) notifyAllowExecuteTasks() {
 	if d.IsStatus(workers.DispatcherStatusProcess) && len(d.allowExecuteTasks) == 0 {
 		d.allowExecuteTasks <- struct{}{}
 	}
+}
+
+func (d *SimpleDispatcher) setStatusDispatcher(status workers.Status) {
+	last := d.Status()
+	d.StatusItemBase.SetStatus(status)
+	d.events.AsyncTrigger(workers.EventIdDispatcherStatusChanged, d, status, last)
+}
+
+func (d *SimpleDispatcher) setStatusWorker(worker workers.ManagerItem, status workers.Status) {
+	last := worker.Status()
+	worker.SetStatus(status)
+	d.events.AsyncTrigger(workers.EventIdWorkerStatusChanged, worker.(*manager.WorkersManagerItem).Worker(), status, last)
+}
+
+func (d *SimpleDispatcher) setStatusTask(task workers.ManagerItem, status workers.Status) {
+	last := task.Status()
+	task.SetStatus(status)
+	d.events.AsyncTrigger(workers.EventIdTaskStatusChanged, task.(*manager.TasksManagerItem).Task(), status, last)
 }

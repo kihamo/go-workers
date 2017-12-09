@@ -4,9 +4,9 @@ package workers
 
 import "strconv"
 
-const _DispatcherStatus_name = "WaitProcessCancel"
+const _DispatcherStatus_name = "UndefinedWaitProcessCancel"
 
-var _DispatcherStatus_index = [...]uint8{0, 4, 11, 17}
+var _DispatcherStatus_index = [...]uint8{0, 9, 13, 20, 26}
 
 func (i DispatcherStatus) String() string {
 	if i < 0 || i >= DispatcherStatus(len(_DispatcherStatus_index)-1) {

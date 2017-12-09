@@ -4,9 +4,9 @@ package workers
 
 import "strconv"
 
-const _TaskStatus_name = "WaitProcessSuccessFailRepeatWaitCancel"
+const _TaskStatus_name = "UndefinedWaitProcessSuccessFailRepeatWaitCancel"
 
-var _TaskStatus_index = [...]uint8{0, 4, 11, 18, 22, 32, 38}
+var _TaskStatus_index = [...]uint8{0, 9, 13, 20, 27, 31, 41, 47}
 
 func (i TaskStatus) String() string {
 	if i < 0 || i >= TaskStatus(len(_TaskStatus_index)-1) {

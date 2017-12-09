@@ -21,19 +21,19 @@ type TasksManagerItem struct {
 }
 
 func NewTasksManagerItem(task workers.Task, status workers.TaskStatus) *TasksManagerItem {
-	t := &TasksManagerItem{
+	item := &TasksManagerItem{
 		task:         task,
 		allowStartAt: time.Now(),
 	}
 
-	t.SetStatus(status)
+	item.SetStatus(status)
 
 	d := task.Duration()
 	if d > 0 {
-		t.allowStartAt.Add(d)
+		item.allowStartAt.Add(d)
 	}
 
-	return t
+	return item
 }
 
 func (t *TasksManagerItem) Task() workers.Task {
