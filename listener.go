@@ -5,3 +5,7 @@ import (
 )
 
 type Listener func(time.Time, ...interface{})
+
+func (l Listener) String() string {
+	return FunctionName(l)
+}

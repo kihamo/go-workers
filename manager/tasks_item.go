@@ -24,6 +24,7 @@ func NewTasksManagerItem(task workers.Task, status workers.TaskStatus) *TasksMan
 	item := &TasksManagerItem{
 		task:         task,
 		allowStartAt: time.Now(),
+		index:        -1,
 	}
 
 	item.SetStatus(status)
@@ -42,6 +43,16 @@ func (t *TasksManagerItem) Task() workers.Task {
 
 func (t *TasksManagerItem) Id() string {
 	return t.task.Id()
+}
+
+func (t *TasksManagerItem) Metadata() workers.Metadata {
+	return workers.Metadata{
+		workers.TaskMetadataStatus:       t.Status(),
+		workers.TaskMetadataAttempts:     t.Attempts(),
+		workers.TaskMetadataAllowStartAt: t.AllowStartAt(),
+		workers.TaskMetadataStartedAt:    t.StartedAt(),
+		workers.TaskMetadataFinishedAt:   t.FinishedAt(),
+	}
 }
 
 func (t *TasksManagerItem) Attempts() int64 {

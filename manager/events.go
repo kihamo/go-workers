@@ -74,6 +74,7 @@ func (m *EventsManager) Trigger(id workers.EventId, args ...interface{}) {
 	now := time.Now()
 
 	for _, l := range m.ListenersByEventId(id) {
+		// TODO: timeout
 		l(now, args...)
 	}
 }
@@ -83,6 +84,7 @@ func (m *EventsManager) AsyncTrigger(id workers.EventId, args ...interface{}) {
 
 	for _, l := range m.ListenersByEventId(id) {
 		go func(f workers.Listener) {
+			// TODO: timeout
 			f(now, args...)
 		}(l)
 	}

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"sync"
 
+	"fmt"
+
 	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/manager"
 )
@@ -63,6 +65,7 @@ func (d *SimpleDispatcher) Run() error {
 
 	go d.doResultCollector()
 	go d.doDispatch()
+	d.notifyAllowExecuteTasks()
 
 	<-d.ctx.Done()
 	d.setStatusDispatcher(workers.DispatcherStatusCancel)
@@ -84,6 +87,10 @@ func (d *SimpleDispatcher) Run() error {
 func (d *SimpleDispatcher) Cancel() error {
 	d.ctxCancel()
 	return d.ctx.Err()
+}
+
+func (d *SimpleDispatcher) Metadata() workers.Metadata {
+	return workers.Metadata{}
 }
 
 func (d *SimpleDispatcher) Status() workers.DispatcherStatus {
@@ -122,11 +129,9 @@ func (d *SimpleDispatcher) RemoveWorker(worker workers.Worker) {
 	return
 }
 
-func (d *SimpleDispatcher) GetWorkerStatus(id string) workers.Status {
-	item := d.workers.GetById(id)
-
-	if item != nil {
-		return item.Status()
+func (d *SimpleDispatcher) GetWorkerMetadata(id string) workers.Metadata {
+	if item := d.workers.GetById(id); item != nil {
+		return item.Metadata()
 	}
 
 	return nil
@@ -171,11 +176,12 @@ func (d *SimpleDispatcher) RemoveTask(task workers.Task) {
 	return
 }
 
-func (d *SimpleDispatcher) GetTaskStatus(id string) workers.Status {
-	item := d.tasks.GetById(id)
+func (d *SimpleDispatcher) GetTaskMetadata(id string) workers.Metadata {
+	fmt.Println("Workers check", d.workers.Check())
+	fmt.Println("Tasks check", d.tasks.Check())
 
-	if item != nil {
-		return item.Status()
+	if item := d.tasks.GetById(id); item != nil {
+		return item.Metadata()
 	}
 
 	return nil
@@ -194,10 +200,12 @@ func (d *SimpleDispatcher) GetTasks() []workers.Task {
 
 func (d *SimpleDispatcher) AddListener(id workers.EventId, listener workers.Listener) {
 	d.events.Attach(id, listener)
+	d.events.AsyncTrigger(workers.EventIdListenerAdd, id, listener)
 }
 
 func (d *SimpleDispatcher) RemoveListener(id workers.EventId, listener workers.Listener) {
 	d.events.DeAttach(id, listener)
+	d.events.AsyncTrigger(workers.EventIdListenerRemove, id, listener)
 }
 
 func (d *SimpleDispatcher) GetListeners() map[workers.EventId][]workers.Listener {
@@ -214,8 +222,6 @@ func (d *SimpleDispatcher) doResultCollector() {
 				continue
 			}
 
-			d.tasks.Remove(result.taskItem)
-
 			d.setStatusWorker(result.workerItem, workers.WorkerStatusWait)
 			d.workers.Push(result.workerItem)
 
@@ -225,12 +231,14 @@ func (d *SimpleDispatcher) doResultCollector() {
 				d.setStatusTask(result.taskItem, workers.TaskStatusSuccess)
 			}
 
-			if repeats := result.taskItem.Task().Repeats(); repeats == -1 || result.taskItem.Attempts() < repeats {
+			if repeats := result.taskItem.Task().Repeats(); repeats < 0 || result.taskItem.Attempts() < repeats {
 				d.setStatusTask(result.taskItem, workers.TaskStatusRepeatWait)
 				d.tasks.Push(result.taskItem)
+			} else {
+				d.tasks.Remove(result.taskItem)
 			}
 
-			d.events.AsyncTrigger(workers.EventIdTaskExecuteStop, result.taskItem.Task(), result.workerItem)
+			d.events.AsyncTrigger(workers.EventIdTaskExecuteStop, result.taskItem.Task(), result.workerItem.Worker(), result.result, result.err)
 			d.notifyAllowExecuteTasks()
 
 		case <-d.ctx.Done():
@@ -250,7 +258,7 @@ func (d *SimpleDispatcher) doDispatch() {
 				continue
 			}
 
-			if d.tasks.Check() && d.workers.Check() {
+			for d.tasks.Check() && d.workers.Check() {
 				pullWorker := d.workers.Pull()
 				pullTask := d.tasks.Pull()
 

@@ -17,6 +17,7 @@ type ManagerItem interface {
 	IsLocked() bool
 
 	Id() string
+	Metadata() Metadata
 }
 
 type ManagerItemBase struct {
@@ -35,4 +36,8 @@ func (i *ManagerItemBase) Unlock() {
 
 func (i *ManagerItemBase) IsLocked() bool {
 	return atomic.LoadInt64(&i.lock) == LockTrue
+}
+
+func (i *ManagerItemBase) Metadata() Metadata {
+	return nil
 }

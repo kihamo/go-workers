@@ -85,7 +85,7 @@ func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
 		}
 	}
 
-	return worker
+	return nil
 }
 
 func (m *WorkersManager) Remove(item workers.ManagerItem) {

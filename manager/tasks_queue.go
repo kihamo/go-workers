@@ -10,17 +10,19 @@ type tasksQueue struct {
 }
 
 func newTasksQueue() *tasksQueue {
-	return &tasksQueue{}
+	return &tasksQueue{
+		list: make([]*TasksManagerItem, 0),
+	}
 }
 
-func (q tasksQueue) Len() int {
+func (q *tasksQueue) Len() int {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
 	return len(q.list)
 }
 
-func (q tasksQueue) Less(i, j int) bool {
+func (q *tasksQueue) Less(i, j int) bool {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
@@ -35,7 +37,7 @@ func (q tasksQueue) Less(i, j int) bool {
 	return q.list[i].Task().Priority() < q.list[j].Task().Priority()
 }
 
-func (q tasksQueue) Swap(i, j int) {
+func (q *tasksQueue) Swap(i, j int) {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
@@ -73,6 +75,7 @@ func (q *tasksQueue) Pop() interface{} {
 	item.setIndex(-1)
 
 	q.list = old[:n]
+
 	return item
 }
 
@@ -80,5 +83,8 @@ func (q *tasksQueue) All() []*TasksManagerItem {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
 
-	return q.list
+	tmp := make([]*TasksManagerItem, len(q.list))
+	copy(tmp, q.list)
+
+	return tmp
 }

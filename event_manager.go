@@ -14,6 +14,8 @@ const (
 	EventIdTaskExecuteStart
 	EventIdTaskExecuteStop
 	EventIdTaskStatusChanged
+	EventIdListenerAdd
+	EventIdListenerRemove
 )
 
 func (i EventId) Int64() int64 {

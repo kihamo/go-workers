@@ -26,16 +26,17 @@ type Dispatcher interface {
 	Run() error
 	Cancel() error
 	Status() DispatcherStatus
+	Metadata() Metadata
 
 	AddWorker(Worker) error
 	RemoveWorker(Worker)
 	GetWorkers() []Worker
-	GetWorkerStatus(string) Status
+	GetWorkerMetadata(string) Metadata
 
 	AddTask(Task) error
 	RemoveTask(Task)
 	GetTasks() []Task
-	GetTaskStatus(string) Status
+	GetTaskMetadata(string) Metadata
 
 	AddListener(EventId, Listener)
 	RemoveListener(EventId, Listener)

@@ -27,7 +27,10 @@ func (m *TasksManager) Push(task workers.ManagerItem) error {
 
 	t := task.(*TasksManagerItem)
 
-	heap.Push(m.queue, t)
+	if t.Index() < 0 {
+		heap.Push(m.queue, t)
+	}
+
 	if t.IsWait() {
 		atomic.AddInt64(&m.waitCounts, 1)
 	}
@@ -40,18 +43,24 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 		return nil
 	}
 
+	forReturn := []workers.ManagerItem{}
+
+	defer func() {
+		for _, item := range forReturn {
+			heap.Push(m.queue, item)
+		}
+	}()
+
 	for item := heap.Pop(m.queue); item != nil; item = heap.Pop(m.queue) {
 		mItem := item.(workers.ManagerItem)
+		forReturn = append(forReturn, mItem)
 
 		if item.(*TasksManagerItem).IsWait() {
 			mItem.Lock()
 			atomic.AddInt64(&m.waitCounts, -1)
 
-			heap.Push(m.queue, item)
 			return mItem
 		}
-
-		heap.Push(m.queue, item)
 	}
 
 	return nil
@@ -61,9 +70,8 @@ func (m *TasksManager) Remove(item workers.ManagerItem) {
 	t := item.(*TasksManagerItem)
 
 	i := t.Index()
-	if i > 0 && i < m.queue.Len() {
-		// TODO: Fix or Remove ???
-		heap.Fix(m.queue, i)
+	if i >= 0 && i < m.queue.Len() {
+		heap.Remove(m.queue, i)
 
 		if !t.IsLocked() {
 			// TODO: check is exists
