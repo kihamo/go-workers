@@ -5,8 +5,6 @@ import (
 	"errors"
 	"sync"
 
-	"fmt"
-
 	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/manager"
 )
@@ -90,7 +88,10 @@ func (d *SimpleDispatcher) Cancel() error {
 }
 
 func (d *SimpleDispatcher) Metadata() workers.Metadata {
-	return workers.Metadata{}
+	return workers.Metadata{
+		workers.DispatcherMetadataWorkersWaiting: d.workers.WaitingCount(),
+		workers.DispatcherMetadataTasksWaiting:   d.tasks.WaitingCount(),
+	}
 }
 
 func (d *SimpleDispatcher) Status() workers.DispatcherStatus {
@@ -177,9 +178,6 @@ func (d *SimpleDispatcher) RemoveTask(task workers.Task) {
 }
 
 func (d *SimpleDispatcher) GetTaskMetadata(id string) workers.Metadata {
-	fmt.Println("Workers check", d.workers.Check())
-	fmt.Println("Tasks check", d.tasks.Check())
-
 	if item := d.tasks.GetById(id); item != nil {
 		return item.Metadata()
 	}
@@ -258,7 +256,7 @@ func (d *SimpleDispatcher) doDispatch() {
 				continue
 			}
 
-			for d.tasks.Check() && d.workers.Check() {
+			for d.tasks.WaitingCount() > 0 && d.workers.WaitingCount() > 0 {
 				pullWorker := d.workers.Pull()
 				pullTask := d.tasks.Pull()
 

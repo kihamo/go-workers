@@ -13,7 +13,7 @@ type WorkersManager struct {
 	mutex      sync.RWMutex
 	queue      []workers.ManagerItem
 	workers    map[string]workers.ManagerItem
-	freeCounts int64
+	freeCounts uint64
 }
 
 func NewWorkersManager() *WorkersManager {
@@ -48,14 +48,14 @@ func (m *WorkersManager) Push(worker workers.ManagerItem) error {
 	}
 
 	m.queue = append(m.queue, worker)
-	atomic.AddInt64(&m.freeCounts, 1)
+	atomic.AddUint64(&m.freeCounts, 1)
 
 	m.mutex.Unlock()
 	return nil
 }
 
 func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
-	if !m.Check() {
+	if m.WaitingCount() < 1 {
 		return worker
 	}
 
@@ -76,7 +76,7 @@ func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
 		if _, ok := m.workers[worker.Id()]; ok {
 			if !worker.IsLocked() {
 				worker.Lock()
-				atomic.AddInt64(&m.freeCounts, -1)
+				atomic.AddUint64(&m.freeCounts, ^uint64(0))
 
 				return worker
 			}
@@ -95,7 +95,7 @@ func (m *WorkersManager) Remove(item workers.ManagerItem) {
 		delete(m.workers, item.Id())
 
 		if !w.IsLocked() {
-			atomic.AddInt64(&m.freeCounts, -1)
+			atomic.AddUint64(&m.freeCounts, ^uint64(0))
 		} else {
 			w.Unlock()
 		}
@@ -128,6 +128,6 @@ func (m *WorkersManager) GetAll() []workers.ManagerItem {
 	return collection
 }
 
-func (m *WorkersManager) Check() bool {
-	return atomic.LoadInt64(&m.freeCounts) > 0
+func (m *WorkersManager) WaitingCount() uint64 {
+	return atomic.LoadUint64(&m.freeCounts)
 }

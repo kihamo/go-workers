@@ -6,5 +6,5 @@ type Manager interface {
 	Remove(ManagerItem)
 	GetById(string) ManagerItem
 	GetAll() []ManagerItem
-	Check() bool
+	WaitingCount() uint64
 }

@@ -10,7 +10,7 @@ import (
 
 type TasksManager struct {
 	queue      *tasksQueue
-	waitCounts int64
+	waitCounts uint64
 }
 
 func NewTasksManager() *TasksManager {
@@ -32,14 +32,14 @@ func (m *TasksManager) Push(task workers.ManagerItem) error {
 	}
 
 	if t.IsWait() {
-		atomic.AddInt64(&m.waitCounts, 1)
+		atomic.AddUint64(&m.waitCounts, 1)
 	}
 
 	return nil
 }
 
 func (m *TasksManager) Pull() workers.ManagerItem {
-	if !m.Check() {
+	if m.WaitingCount() < 1 {
 		return nil
 	}
 
@@ -57,7 +57,7 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 
 		if item.(*TasksManagerItem).IsWait() {
 			mItem.Lock()
-			atomic.AddInt64(&m.waitCounts, -1)
+			atomic.AddUint64(&m.waitCounts, ^uint64(0))
 
 			return mItem
 		}
@@ -75,7 +75,7 @@ func (m *TasksManager) Remove(item workers.ManagerItem) {
 
 		if !t.IsLocked() {
 			// TODO: check is exists
-			atomic.AddInt64(&m.waitCounts, -1)
+			atomic.AddUint64(&m.waitCounts, ^uint64(0))
 		} else {
 			t.Unlock()
 		}
@@ -105,6 +105,6 @@ func (m *TasksManager) GetAll() []workers.ManagerItem {
 	return collection
 }
 
-func (m *TasksManager) Check() bool {
-	return atomic.LoadInt64(&m.waitCounts) > 0
+func (m *TasksManager) WaitingCount() uint64 {
+	return atomic.LoadUint64(&m.waitCounts)
 }
