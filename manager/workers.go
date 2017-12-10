@@ -10,17 +10,17 @@ import (
 )
 
 type WorkersManager struct {
-	mutex      sync.RWMutex
-	queue      []workers.ManagerItem
-	workers    map[string]workers.ManagerItem
-	freeCounts uint64
+	mutex          sync.RWMutex
+	queue          []workers.ManagerItem
+	workers        map[string]workers.ManagerItem
+	unlockedCounts uint64
 }
 
 func NewWorkersManager() *WorkersManager {
 	c := &WorkersManager{
-		queue:      []workers.ManagerItem{},
-		workers:    map[string]workers.ManagerItem{},
-		freeCounts: 0,
+		queue:          []workers.ManagerItem{},
+		workers:        map[string]workers.ManagerItem{},
+		unlockedCounts: 0,
 	}
 
 	return c
@@ -42,51 +42,40 @@ func (m *WorkersManager) Push(worker workers.ManagerItem) error {
 	worker.Unlock()
 
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	if !ok {
 		m.workers[worker.Id()] = worker
 	}
 
 	m.queue = append(m.queue, worker)
-	atomic.AddUint64(&m.freeCounts, 1)
+	atomic.AddUint64(&m.unlockedCounts, 1)
 
-	m.mutex.Unlock()
 	return nil
 }
 
 func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
-	if m.WaitingCount() < 1 {
-		return worker
+	if m.UnlockedCount() < 1 {
+		return nil
 	}
 
-	var ret workers.ManagerItem
-	forReturn := []workers.ManagerItem{}
-
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	for len(m.queue) > 0 {
 		worker, m.queue = m.queue[0], m.queue[1:]
 
-		if _, ok := m.workers[worker.Id()]; ok {
-			if !worker.IsLocked() {
-				worker.Lock()
-				atomic.AddUint64(&m.freeCounts, ^uint64(0))
-				ret = worker
-
-				break
-			}
-
-			forReturn = append(forReturn, worker)
+		if _, ok := m.workers[worker.Id()]; !ok || worker.IsLocked() {
+			continue
 		}
+
+		worker.Lock()
+		atomic.AddUint64(&m.unlockedCounts, ^uint64(0))
+
+		return worker
 	}
 
-	for _, w := range forReturn {
-		m.queue = append(m.queue, w)
-	}
-
-	m.mutex.Unlock()
-
-	return ret
+	return nil
 }
 
 func (m *WorkersManager) Remove(item workers.ManagerItem) {
@@ -96,7 +85,7 @@ func (m *WorkersManager) Remove(item workers.ManagerItem) {
 		delete(m.workers, item.Id())
 
 		if !w.IsLocked() {
-			atomic.AddUint64(&m.freeCounts, ^uint64(0))
+			atomic.AddUint64(&m.unlockedCounts, ^uint64(0))
 		} else {
 			w.Unlock()
 		}
@@ -129,6 +118,6 @@ func (m *WorkersManager) GetAll() []workers.ManagerItem {
 	return collection
 }
 
-func (m *WorkersManager) WaitingCount() uint64 {
-	return atomic.LoadUint64(&m.freeCounts)
+func (m *WorkersManager) UnlockedCount() uint64 {
+	return atomic.LoadUint64(&m.unlockedCounts)
 }

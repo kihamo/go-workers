@@ -89,8 +89,8 @@ func (d *SimpleDispatcher) Cancel() error {
 
 func (d *SimpleDispatcher) Metadata() workers.Metadata {
 	return workers.Metadata{
-		workers.DispatcherMetadataWorkersWaiting: d.workers.WaitingCount(),
-		workers.DispatcherMetadataTasksWaiting:   d.tasks.WaitingCount(),
+		workers.DispatcherMetadataWorkersUnlocked: d.workers.UnlockedCount(),
+		workers.DispatcherMetadataTasksUnlocked:   d.tasks.UnlockedCount(),
 	}
 }
 
@@ -257,14 +257,11 @@ func (d *SimpleDispatcher) doDispatch() {
 				continue
 			}
 
-			for d.tasks.WaitingCount() > 0 && d.workers.WaitingCount() > 0 {
+			for d.tasks.UnlockedCount() > 0 && d.workers.UnlockedCount() > 0 {
 				pullWorker := d.workers.Pull()
 				pullTask := d.tasks.Pull()
 
 				if pullWorker != nil && pullTask != nil {
-					d.setStatusWorker(pullWorker, workers.WorkerStatusProcess)
-					d.setStatusTask(pullTask, workers.TaskStatusProcess)
-
 					castWorker := pullWorker.(*manager.WorkersManagerItem)
 					castTask := pullTask.(*manager.TasksManagerItem)
 
@@ -288,8 +285,11 @@ func (d *SimpleDispatcher) doRunTask(workerItem *manager.WorkersManagerItem, tas
 	task := taskItem.Task()
 
 	workerItem.SetTask(task)
+	d.setStatusWorker(workerItem, workers.WorkerStatusProcess)
 
 	taskItem.SetAttempts(taskItem.Attempts() + 1)
+	d.setStatusTask(taskItem, workers.TaskStatusProcess)
+
 	ctx := workers.NewContextWithAttempt(d.ctx, taskItem.Attempts())
 
 	var ctxCancel context.CancelFunc

@@ -3,20 +3,22 @@ package manager
 import (
 	"container/heap"
 	"errors"
+	"sync"
 	"sync/atomic"
 
 	"github.com/kihamo/go-workers"
 )
 
 type TasksManager struct {
-	queue      *tasksQueue
-	waitCounts uint64
+	mutex          sync.Mutex
+	queue          *tasksQueue
+	unlockedCounts uint64
 }
 
 func NewTasksManager() *TasksManager {
 	return &TasksManager{
-		queue:      newTasksQueue(),
-		waitCounts: 0,
+		queue:          newTasksQueue(),
+		unlockedCounts: 0,
 	}
 }
 
@@ -25,23 +27,29 @@ func (m *TasksManager) Push(task workers.ManagerItem) error {
 		return errors.New("TasksManagerItem can't be nil")
 	}
 
+	task.Unlock()
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	t := task.(*TasksManagerItem)
 
 	if t.Index() < 0 {
 		heap.Push(m.queue, t)
 	}
 
-	if t.IsWait() {
-		atomic.AddUint64(&m.waitCounts, 1)
-	}
+	atomic.AddUint64(&m.unlockedCounts, 1)
 
 	return nil
 }
 
 func (m *TasksManager) Pull() workers.ManagerItem {
-	if m.WaitingCount() < 1 {
+	if m.UnlockedCount() < 1 {
 		return nil
 	}
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	var ret workers.ManagerItem
 	forReturn := []workers.ManagerItem{}
@@ -50,9 +58,9 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 		mItem := item.(workers.ManagerItem)
 		forReturn = append(forReturn, mItem)
 
-		if item.(*TasksManagerItem).IsWait() {
+		if !mItem.IsLocked() {
 			mItem.Lock()
-			atomic.AddUint64(&m.waitCounts, ^uint64(0))
+			atomic.AddUint64(&m.unlockedCounts, ^uint64(0))
 			ret = mItem
 
 			break
@@ -67,6 +75,9 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 }
 
 func (m *TasksManager) Remove(item workers.ManagerItem) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
 	t := item.(*TasksManagerItem)
 
 	i := t.Index()
@@ -75,7 +86,7 @@ func (m *TasksManager) Remove(item workers.ManagerItem) {
 
 		if !t.IsLocked() {
 			// TODO: check is exists
-			atomic.AddUint64(&m.waitCounts, ^uint64(0))
+			atomic.AddUint64(&m.unlockedCounts, ^uint64(0))
 		} else {
 			t.Unlock()
 		}
@@ -103,6 +114,6 @@ func (m *TasksManager) GetAll() []workers.ManagerItem {
 	return collection
 }
 
-func (m *TasksManager) WaitingCount() uint64 {
-	return atomic.LoadUint64(&m.waitCounts)
+func (m *TasksManager) UnlockedCount() uint64 {
+	return atomic.LoadUint64(&m.unlockedCounts)
 }
