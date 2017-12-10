@@ -43,13 +43,8 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 		return nil
 	}
 
+	var ret workers.ManagerItem
 	forReturn := []workers.ManagerItem{}
-
-	defer func() {
-		for _, item := range forReturn {
-			heap.Push(m.queue, item)
-		}
-	}()
 
 	for item := heap.Pop(m.queue); item != nil; item = heap.Pop(m.queue) {
 		mItem := item.(workers.ManagerItem)
@@ -58,12 +53,17 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 		if item.(*TasksManagerItem).IsWait() {
 			mItem.Lock()
 			atomic.AddUint64(&m.waitCounts, ^uint64(0))
+			ret = mItem
 
-			return mItem
+			break
 		}
 	}
 
-	return nil
+	for _, item := range forReturn {
+		heap.Push(m.queue, item)
+	}
+
+	return ret
 }
 
 func (m *TasksManager) Remove(item workers.ManagerItem) {
@@ -80,8 +80,6 @@ func (m *TasksManager) Remove(item workers.ManagerItem) {
 			t.Unlock()
 		}
 	}
-
-	t.setIndex(-1)
 }
 
 func (m *TasksManager) GetById(id string) workers.ManagerItem {

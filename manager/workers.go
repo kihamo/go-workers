@@ -59,16 +59,10 @@ func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
 		return worker
 	}
 
-	m.mutex.Lock()
+	var ret workers.ManagerItem
 	forReturn := []workers.ManagerItem{}
 
-	defer func() {
-		for _, w := range forReturn {
-			m.queue = append(m.queue, w)
-		}
-
-		m.mutex.Unlock()
-	}()
+	m.mutex.Lock()
 
 	for len(m.queue) > 0 {
 		worker, m.queue = m.queue[0], m.queue[1:]
@@ -77,15 +71,22 @@ func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
 			if !worker.IsLocked() {
 				worker.Lock()
 				atomic.AddUint64(&m.freeCounts, ^uint64(0))
+				ret = worker
 
-				return worker
+				break
 			}
 
 			forReturn = append(forReturn, worker)
 		}
 	}
 
-	return nil
+	for _, w := range forReturn {
+		m.queue = append(m.queue, w)
+	}
+
+	m.mutex.Unlock()
+
+	return ret
 }
 
 func (m *WorkersManager) Remove(item workers.ManagerItem) {
