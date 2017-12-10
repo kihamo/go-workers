@@ -220,6 +220,7 @@ func (d *SimpleDispatcher) doResultCollector() {
 				continue
 			}
 
+			result.workerItem.SetTask(nil)
 			d.setStatusWorker(result.workerItem, workers.WorkerStatusWait)
 			d.workers.Push(result.workerItem)
 
@@ -285,6 +286,8 @@ func (d *SimpleDispatcher) doRunTask(workerItem *manager.WorkersManagerItem, tas
 	defer d.wg.Done()
 
 	task := taskItem.Task()
+
+	workerItem.SetTask(task)
 
 	taskItem.SetAttempts(taskItem.Attempts() + 1)
 	ctx := workers.NewContextWithAttempt(d.ctx, taskItem.Attempts())

@@ -9,6 +9,7 @@ const (
 
 const (
 	WorkerMetadataStatus MetadataKey = iota
+	WorkerMetadataTask
 )
 
 const (
