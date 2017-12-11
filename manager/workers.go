@@ -80,6 +80,7 @@ func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
 
 func (m *WorkersManager) Remove(item workers.ManagerItem) {
 	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	if w, ok := m.workers[item.Id()]; ok {
 		delete(m.workers, item.Id())
@@ -90,8 +91,6 @@ func (m *WorkersManager) Remove(item workers.ManagerItem) {
 			w.Unlock()
 		}
 	}
-
-	m.mutex.Unlock()
 }
 
 func (m *WorkersManager) GetById(id string) workers.ManagerItem {

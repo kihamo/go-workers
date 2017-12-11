@@ -26,7 +26,6 @@ func (i TaskStatus) Int64() int64 {
 }
 
 type Task interface {
-	Cancel() error
 	Run(context.Context) (interface{}, error)
 	Id() string
 	Name() string

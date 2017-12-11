@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"sync"
 
 	"github.com/kihamo/go-workers"
@@ -12,6 +13,7 @@ type WorkersManagerItem struct {
 
 	worker workers.Worker
 	task   workers.Task
+	cancel context.CancelFunc
 }
 
 func NewWorkersManagerItem(worker workers.Worker, status workers.WorkerStatus) *WorkersManagerItem {
@@ -54,4 +56,21 @@ func (w *WorkersManagerItem) SetTask(task workers.Task) {
 	defer w.mutex.Unlock()
 
 	w.task = task
+}
+
+func (w *WorkersManagerItem) SetCancel(cancel context.CancelFunc) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	w.cancel = cancel
+}
+
+func (w *WorkersManagerItem) Cancel() {
+	w.mutex.RLock()
+	cancel := w.cancel
+	w.mutex.RUnlock()
+
+	if cancel != nil {
+		cancel()
+	}
 }

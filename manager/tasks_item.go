@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -10,6 +12,7 @@ import (
 
 type TasksManagerItem struct {
 	workers.ManagerItemBase
+	mutex sync.RWMutex
 
 	task         workers.Task
 	attempts     int64
@@ -17,7 +20,8 @@ type TasksManagerItem struct {
 	startedAt    unsafe.Pointer
 	finishedAt   unsafe.Pointer
 
-	index int64
+	index  int64
+	cancel context.CancelFunc
 }
 
 func NewTasksManagerItem(task workers.Task, status workers.TaskStatus) *TasksManagerItem {
@@ -104,4 +108,21 @@ func (t *TasksManagerItem) setIndex(index int) {
 
 func (t *TasksManagerItem) Status() workers.Status {
 	return workers.TaskStatus(t.StatusInt64())
+}
+
+func (t *TasksManagerItem) SetCancel(cancel context.CancelFunc) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	t.cancel = cancel
+}
+
+func (t *TasksManagerItem) Cancel() {
+	t.mutex.RLock()
+	cancel := t.cancel
+	t.mutex.RUnlock()
+
+	if cancel != nil {
+		cancel()
+	}
 }
