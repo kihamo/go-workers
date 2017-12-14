@@ -9,10 +9,10 @@ import (
 type FunctionTask struct {
 	BaseTask
 
-	function func() (interface{}, error)
+	function func(context.Context) (interface{}, error)
 }
 
-func NewFunctionTask(function func() (interface{}, error)) *FunctionTask {
+func NewFunctionTask(function func(context.Context) (interface{}, error)) *FunctionTask {
 	t := &FunctionTask{
 		function: function,
 	}
@@ -21,8 +21,8 @@ func NewFunctionTask(function func() (interface{}, error)) *FunctionTask {
 	return t
 }
 
-func (t *FunctionTask) Run(context.Context) (interface{}, error) {
-	return t.function()
+func (t *FunctionTask) Run(ctx context.Context) (interface{}, error) {
+	return t.function(ctx)
 }
 
 func (t *FunctionTask) Name() string {
