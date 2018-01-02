@@ -30,15 +30,16 @@ type Dispatcher interface {
 
 	AddWorker(Worker) error
 	RemoveWorker(Worker)
-	GetWorkers() []Worker
 	GetWorkerMetadata(string) Metadata
+	GetWorkers() []Worker
 
 	AddTask(Task) error
 	RemoveTask(Task)
-	GetTasks() []Task
 	GetTaskMetadata(string) Metadata
+	GetTasks() []Task
 
-	AddListener(EventId, Listener)
+	AddListener(EventId, Listener) error
 	RemoveListener(EventId, Listener)
-	GetListeners() map[EventId][]Listener
+	GetListenerMetadata(string) Metadata
+	GetListeners() []Listener
 }

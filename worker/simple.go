@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,4 +35,8 @@ func (w *SimpleWorker) CreatedAt() time.Time {
 
 func (w *SimpleWorker) String() string {
 	return "Worker #" + w.Id()
+}
+
+func (w *SimpleWorker) GoString() string {
+	return fmt.Sprintf("%s %#p", w.String(), w)
 }

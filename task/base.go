@@ -1,6 +1,7 @@
 package task
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -78,4 +79,8 @@ func (t *BaseTask) CreatedAt() time.Time {
 
 func (t *BaseTask) String() string {
 	return "Task #" + t.Id()
+}
+
+func (t *BaseTask) GoString() string {
+	return fmt.Sprintf("%s %#p", t.String(), t)
 }

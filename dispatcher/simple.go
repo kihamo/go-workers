@@ -24,9 +24,9 @@ type SimpleDispatcher struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	workers workers.Manager
-	tasks   workers.Manager
-	events  workers.EventsManager
+	workers   workers.Manager
+	tasks     workers.Manager
+	listeners *manager.ListenersManager
 
 	allowExecuteTasks chan struct{}
 	results           chan SimpleDispatcherResult
@@ -40,7 +40,7 @@ func NewSimpleDispatcherWithContext(ctx context.Context) *SimpleDispatcher {
 	d := &SimpleDispatcher{
 		workers:           manager.NewWorkersManager(),
 		tasks:             manager.NewTasksManager(),
-		events:            manager.NewEventsManager(),
+		listeners:         manager.NewListenersManager(),
 		allowExecuteTasks: make(chan struct{}, 1),
 		results:           make(chan SimpleDispatcherResult),
 	}
@@ -109,7 +109,7 @@ func (d *SimpleDispatcher) AddWorker(worker workers.Worker) error {
 		return err
 	}
 
-	d.events.AsyncTrigger(workers.EventIdWorkerAdd, worker)
+	d.listeners.AsyncTrigger(workers.EventIdWorkerAdd, worker)
 	d.notifyAllowExecuteTasks()
 	return nil
 }
@@ -124,7 +124,7 @@ func (d *SimpleDispatcher) RemoveWorker(worker workers.Worker) {
 		workerItem.SetTask(nil)
 
 		d.workers.Remove(item)
-		d.events.AsyncTrigger(workers.EventIdWorkerRemove, workerItem.Worker())
+		d.listeners.AsyncTrigger(workers.EventIdWorkerRemove, workerItem.Worker())
 	}
 
 	return
@@ -155,7 +155,7 @@ func (d *SimpleDispatcher) AddTask(task workers.Task) error {
 		return err
 	}
 
-	d.events.AsyncTrigger(workers.EventIdTaskAdd, task)
+	d.listeners.AsyncTrigger(workers.EventIdTaskAdd, task)
 	d.notifyAllowExecuteTasks()
 	return nil
 }
@@ -169,7 +169,7 @@ func (d *SimpleDispatcher) RemoveTask(task workers.Task) {
 		taskItem.Cancel()
 
 		d.tasks.Remove(item)
-		d.events.AsyncTrigger(workers.EventIdTaskRemove, taskItem.Task())
+		d.listeners.AsyncTrigger(workers.EventIdTaskRemove, taskItem.Task())
 	}
 
 	return
@@ -194,18 +194,28 @@ func (d *SimpleDispatcher) GetTasks() []workers.Task {
 	return collection
 }
 
-func (d *SimpleDispatcher) AddListener(id workers.EventId, listener workers.Listener) {
-	d.events.Attach(id, listener)
-	d.events.AsyncTrigger(workers.EventIdListenerAdd, id, listener)
+func (d *SimpleDispatcher) AddListener(eventId workers.EventId, listener workers.Listener) error {
+	d.listeners.Attach(eventId, listener)
+	d.listeners.AsyncTrigger(workers.EventIdListenerAdd, eventId, listener)
+
+	return nil
 }
 
-func (d *SimpleDispatcher) RemoveListener(id workers.EventId, listener workers.Listener) {
-	d.events.DeAttach(id, listener)
-	d.events.AsyncTrigger(workers.EventIdListenerRemove, id, listener)
+func (d *SimpleDispatcher) RemoveListener(eventId workers.EventId, listener workers.Listener) {
+	d.listeners.DeAttach(eventId, listener)
+	d.listeners.AsyncTrigger(workers.EventIdListenerRemove, eventId, listener)
 }
 
-func (d *SimpleDispatcher) GetListeners() map[workers.EventId][]workers.Listener {
-	return d.events.Listeners()
+func (d *SimpleDispatcher) GetListenerMetadata(id string) workers.Metadata {
+	if item := d.listeners.GetById(id); item != nil {
+		return item.Metadata()
+	}
+
+	return nil
+}
+
+func (d *SimpleDispatcher) GetListeners() []workers.Listener {
+	return d.listeners.Listeners()
 }
 
 func (d *SimpleDispatcher) doResultCollector() {
@@ -243,7 +253,7 @@ func (d *SimpleDispatcher) doResultCollector() {
 				}
 			}
 
-			d.events.AsyncTrigger(workers.EventIdTaskExecuteStop, result.taskItem.Task(), result.workerItem.Worker(), result.result, result.err)
+			d.listeners.AsyncTrigger(workers.EventIdTaskExecuteStop, result.taskItem.Task(), result.workerItem.Worker(), result.result, result.err)
 			d.notifyAllowExecuteTasks()
 
 		case <-d.ctx.Done():
@@ -271,7 +281,7 @@ func (d *SimpleDispatcher) doDispatch() {
 					castWorker := pullWorker.(*manager.WorkersManagerItem)
 					castTask := pullTask.(*manager.TasksManagerItem)
 
-					d.events.AsyncTrigger(workers.EventIdTaskExecuteStart, castTask.Task(), castWorker.Worker())
+					d.listeners.AsyncTrigger(workers.EventIdTaskExecuteStart, castTask.Task(), castWorker.Worker())
 					go d.doRunTask(castWorker, castTask)
 				}
 				// TODO: log else
@@ -361,17 +371,17 @@ func (d *SimpleDispatcher) notifyAllowExecuteTasks() {
 func (d *SimpleDispatcher) setStatusDispatcher(status workers.Status) {
 	last := d.Status()
 	d.StatusItemBase.SetStatus(status)
-	d.events.AsyncTrigger(workers.EventIdDispatcherStatusChanged, d, status, last)
+	d.listeners.AsyncTrigger(workers.EventIdDispatcherStatusChanged, d, status, last)
 }
 
 func (d *SimpleDispatcher) setStatusWorker(worker workers.ManagerItem, status workers.Status) {
 	last := worker.Status()
 	worker.SetStatus(status)
-	d.events.AsyncTrigger(workers.EventIdWorkerStatusChanged, worker.(*manager.WorkersManagerItem).Worker(), status, last)
+	d.listeners.AsyncTrigger(workers.EventIdWorkerStatusChanged, worker.(*manager.WorkersManagerItem).Worker(), status, last)
 }
 
 func (d *SimpleDispatcher) setStatusTask(task workers.ManagerItem, status workers.Status) {
 	last := task.Status()
 	task.SetStatus(status)
-	d.events.AsyncTrigger(workers.EventIdTaskStatusChanged, task.(*manager.TasksManagerItem).Task(), status, last)
+	d.listeners.AsyncTrigger(workers.EventIdTaskStatusChanged, task.(*manager.TasksManagerItem).Task(), status, last)
 }

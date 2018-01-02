@@ -1,6 +1,9 @@
 package workers
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 var (
 	attemptContextKey = &ContextKey{"attempt"}
@@ -12,6 +15,10 @@ type ContextKey struct {
 
 func (k *ContextKey) String() string {
 	return "dashboard context value " + k.Name
+}
+
+func (k *ContextKey) GoString() string {
+	return fmt.Sprintf("%s %#p", k.String(), k)
 }
 
 func AttemptFromContext(ctx context.Context) (int64, bool) {

@@ -20,4 +20,11 @@ const (
 	TaskMetadataFinishedAt
 )
 
+const (
+	ListenerMetadataFires MetadataKey = iota
+	ListenerMetadataFirstFiredAt
+	ListenerMetadataLastFireAt
+	ListenerMetadataEventIds
+)
+
 type Metadata map[MetadataKey]interface{}
