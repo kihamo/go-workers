@@ -45,12 +45,25 @@ func (l *ListenersManagerItem) EventIds() []workers.EventId {
 	return tmp
 }
 
+func (l *ListenersManagerItem) EventIdIsAllowed(eventId workers.EventId) bool {
+	l.mutex.RLock()
+	defer l.mutex.RUnlock()
+
+	for _, id := range l.eventIds {
+		if id.Int64() == eventId.Int64() {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (l *ListenersManagerItem) AddEventId(eventId workers.EventId) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
 	for _, id := range l.eventIds {
-		if id == eventId {
+		if id.Int64() == eventId.Int64() {
 			return
 		}
 	}
@@ -75,9 +88,13 @@ func (l *ListenersManagerItem) Listener() workers.Listener {
 }
 
 func (l *ListenersManagerItem) Fire(ctx context.Context, eventId workers.EventId, t time.Time, args ...interface{}) {
+	if !l.EventIdIsAllowed(eventId) {
+		return
+	}
+
 	now := time.Now()
 
-	atomic.StoreInt64(&l.fires, 1)
+	atomic.AddInt64(&l.fires, 1)
 	atomic.StorePointer(&l.lastFireAt, unsafe.Pointer(&now))
 
 	if l.FirstFireAt() == nil {
