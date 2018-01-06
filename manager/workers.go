@@ -11,9 +11,9 @@ import (
 
 type WorkersManager struct {
 	mutex          sync.RWMutex
+	unlockedCounts uint64
 	queue          []workers.ManagerItem
 	workers        map[string]workers.ManagerItem
-	unlockedCounts uint64
 }
 
 func NewWorkersManager() *WorkersManager {

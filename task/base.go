@@ -9,12 +9,12 @@ import (
 )
 
 type BaseTask struct {
-	id        string
-	name      atomic.Value
 	priority  int64
 	repeats   int64
 	duration  int64
 	timeout   int64
+	id        string
+	name      atomic.Value
 	createdAt time.Time
 }
 

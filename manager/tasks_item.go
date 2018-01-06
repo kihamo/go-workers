@@ -14,8 +14,8 @@ type TasksManagerItem struct {
 	workers.ManagerItemBase
 	mutex sync.RWMutex
 
-	task         workers.Task
 	attempts     int64
+	task         workers.Task
 	allowStartAt time.Time
 	startedAt    unsafe.Pointer
 	finishedAt   unsafe.Pointer

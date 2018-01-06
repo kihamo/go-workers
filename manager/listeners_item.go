@@ -12,12 +12,11 @@ import (
 )
 
 type ListenersManagerItem struct {
-	mutex sync.RWMutex
-
+	mutex       sync.RWMutex
+	fires       int64
 	eventIds    []workers.EventId
 	listener    workers.Listener
 	id          string
-	fires       int64
 	firstFireAt unsafe.Pointer
 	lastFireAt  unsafe.Pointer
 }

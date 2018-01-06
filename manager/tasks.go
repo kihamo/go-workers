@@ -11,8 +11,8 @@ import (
 
 type TasksManager struct {
 	mutex          sync.Mutex
-	queue          *tasksQueue
 	unlockedCounts uint64
+	queue          *tasksQueue
 }
 
 func NewTasksManager() *TasksManager {
