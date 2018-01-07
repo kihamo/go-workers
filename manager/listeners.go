@@ -115,7 +115,7 @@ func (m *ListenersManager) AsyncTrigger(eventId workers.EventId, args ...interfa
 
 	for _, item := range listeners {
 		go func(ctx context.Context, i *ListenersManagerItem) {
-			item.Fire(ctx, eventId, now, args...)
+			i.Fire(ctx, eventId, now, args...)
 		}(ctx, item)
 	}
 }
