@@ -5,21 +5,29 @@ import (
 	"errors"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/kihamo/go-workers"
 )
 
 type TasksManager struct {
-	mutex          sync.Mutex
-	unlockedCounts uint64
-	queue          *tasksQueue
+	mutex             sync.Mutex
+	unlockedCounts    uint64
+	queue             *tasksQueue
+	tickerRecalculate *workers.Ticker
 }
 
 func NewTasksManager() *TasksManager {
-	return &TasksManager{
-		queue:          newTasksQueue(),
-		unlockedCounts: 0,
+	m := &TasksManager{
+		queue:             newTasksQueue(),
+		unlockedCounts:    0,
+		tickerRecalculate: workers.NewTicker(time.Second),
 	}
+
+	// TODO: останавливать рутину после остановки диспетчера
+	go m.recalculate()
+
+	return m
 }
 
 func (m *TasksManager) Push(task workers.ManagerItem) error {
@@ -38,7 +46,9 @@ func (m *TasksManager) Push(task workers.ManagerItem) error {
 		heap.Push(m.queue, t)
 	}
 
-	atomic.AddUint64(&m.unlockedCounts, 1)
+	if !t.IsLocked() {
+		atomic.AddUint64(&m.unlockedCounts, 1)
+	}
 
 	return nil
 }
@@ -116,4 +126,22 @@ func (m *TasksManager) GetAll() []workers.ManagerItem {
 
 func (m *TasksManager) UnlockedCount() uint64 {
 	return atomic.LoadUint64(&m.unlockedCounts)
+}
+
+// пересчитывает количество не заблокированных задач, так как оно меняется произвольно из-за отложенной даты запуска
+func (m *TasksManager) recalculate() {
+	for {
+		select {
+		case <-m.tickerRecalculate.C():
+			var unlockedCounts uint64
+
+			for _, t := range m.queue.All() {
+				if !t.IsLocked() {
+					unlockedCounts++
+				}
+			}
+
+			atomic.StoreUint64(&m.unlockedCounts, unlockedCounts)
+		}
+	}
 }

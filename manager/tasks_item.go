@@ -14,11 +14,11 @@ type TasksManagerItem struct {
 	workers.ManagerItemBase
 	mutex sync.RWMutex
 
-	attempts     int64
-	task         workers.Task
-	allowStartAt time.Time
-	startedAt    unsafe.Pointer
-	finishedAt   unsafe.Pointer
+	attempts       int64
+	task           workers.Task
+	allowStartAt   unsafe.Pointer
+	firstStartedAt unsafe.Pointer
+	lastStartedAt  unsafe.Pointer
 
 	index  int64
 	cancel context.CancelFunc
@@ -26,17 +26,18 @@ type TasksManagerItem struct {
 
 func NewTasksManagerItem(task workers.Task, status workers.TaskStatus) *TasksManagerItem {
 	item := &TasksManagerItem{
-		task:         task,
-		allowStartAt: time.Now(),
-		index:        -1,
+		task:  task,
+		index: -1,
 	}
 
+	allowStartAt := time.Now()
+	startedAt := task.StartedAt()
+	if startedAt != nil && startedAt.After(allowStartAt) {
+		allowStartAt = *startedAt
+	}
+
+	item.SetAllowStartAt(allowStartAt)
 	item.SetStatus(status)
-
-	d := task.Duration()
-	if d > 0 {
-		item.allowStartAt.Add(d)
-	}
 
 	return item
 }
@@ -51,11 +52,11 @@ func (t *TasksManagerItem) Id() string {
 
 func (t *TasksManagerItem) Metadata() workers.Metadata {
 	return workers.Metadata{
-		workers.TaskMetadataStatus:       t.Status(),
-		workers.TaskMetadataAttempts:     t.Attempts(),
-		workers.TaskMetadataAllowStartAt: t.AllowStartAt(),
-		workers.TaskMetadataStartedAt:    t.StartedAt(),
-		workers.TaskMetadataFinishedAt:   t.FinishedAt(),
+		workers.TaskMetadataStatus:         t.Status(),
+		workers.TaskMetadataAttempts:       t.Attempts(),
+		workers.TaskMetadataAllowStartAt:   t.AllowStartAt(),
+		workers.TaskMetadataFirstStartedAt: t.FirstStartedAt(),
+		workers.TaskMetadataLastStartedAt:  t.LastStartedAt(),
 	}
 }
 
@@ -67,35 +68,46 @@ func (t *TasksManagerItem) SetAttempts(attempt int64) {
 	atomic.StoreInt64(&t.attempts, attempt)
 }
 
-func (t *TasksManagerItem) AllowStartAt() time.Time {
-	return t.allowStartAt
+func (t *TasksManagerItem) AllowStartAt() *time.Time {
+	p := atomic.LoadPointer(&t.allowStartAt)
+	return (*time.Time)(p)
+}
+
+func (t *TasksManagerItem) SetAllowStartAt(allowStartedAt time.Time) {
+	atomic.StorePointer(&t.allowStartAt, unsafe.Pointer(&allowStartedAt))
 }
 
 func (t *TasksManagerItem) IsAllowedStart() bool {
 	now := time.Now()
-	return t.allowStartAt.Before(now) || t.allowStartAt.Equal(now)
+	allowStartAt := t.AllowStartAt()
+
+	return allowStartAt.Before(now) || allowStartAt.Equal(now)
 }
 
-func (t *TasksManagerItem) StartedAt() *time.Time {
-	p := atomic.LoadPointer(&t.startedAt)
+func (t *TasksManagerItem) FirstStartedAt() *time.Time {
+	p := atomic.LoadPointer(&t.firstStartedAt)
 	return (*time.Time)(p)
 }
 
-func (t *TasksManagerItem) SetStartedAt(startedAt time.Time) {
-	atomic.StorePointer(&t.startedAt, unsafe.Pointer(&startedAt))
+func (t *TasksManagerItem) SetFirstStartedAt(firstStartedAt time.Time) {
+	atomic.StorePointer(&t.firstStartedAt, unsafe.Pointer(&firstStartedAt))
 }
 
-func (t *TasksManagerItem) FinishedAt() *time.Time {
-	p := atomic.LoadPointer(&t.finishedAt)
+func (t *TasksManagerItem) LastStartedAt() *time.Time {
+	p := atomic.LoadPointer(&t.lastStartedAt)
 	return (*time.Time)(p)
 }
 
-func (t *TasksManagerItem) SetFinishedAt(finishedAt time.Time) {
-	atomic.StorePointer(&t.finishedAt, unsafe.Pointer(&finishedAt))
+func (t *TasksManagerItem) SetLastStartedAt(lastStartedAt time.Time) {
+	atomic.StorePointer(&t.lastStartedAt, unsafe.Pointer(&lastStartedAt))
 }
 
 func (t *TasksManagerItem) IsWait() bool {
 	return t.IsStatus(workers.TaskStatusWait) || t.IsStatus(workers.TaskStatusRepeatWait)
+}
+
+func (t *TasksManagerItem) IsLocked() bool {
+	return t.ManagerItemBase.IsLocked() || !t.IsAllowedStart()
 }
 
 func (t *TasksManagerItem) Index() int {

@@ -4,18 +4,20 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/google/uuid"
 )
 
 type BaseTask struct {
-	priority  int64
-	repeats   int64
-	duration  int64
-	timeout   int64
-	id        string
-	name      atomic.Value
-	createdAt time.Time
+	priority       int64
+	repeats        int64
+	repeatInterval int64
+	timeout        int64
+	id             string
+	name           atomic.Value
+	createdAt      time.Time
+	startedAt      unsafe.Pointer
 }
 
 func (t *BaseTask) Init() {
@@ -57,12 +59,12 @@ func (t *BaseTask) SetRepeats(repeats int64) {
 	atomic.StoreInt64(&t.repeats, repeats)
 }
 
-func (t *BaseTask) Duration() time.Duration {
-	return time.Duration(atomic.LoadInt64(&t.duration))
+func (t *BaseTask) RepeatInterval() time.Duration {
+	return time.Duration(atomic.LoadInt64(&t.repeatInterval))
 }
 
-func (t *BaseTask) SetDuration(duration time.Duration) {
-	atomic.StoreInt64(&t.duration, int64(duration))
+func (t *BaseTask) SetRepeatInterval(interval time.Duration) {
+	atomic.StoreInt64(&t.repeatInterval, int64(interval))
 }
 
 func (t *BaseTask) Timeout() time.Duration {
@@ -75,6 +77,15 @@ func (t *BaseTask) SetTimeout(duration time.Duration) {
 
 func (t *BaseTask) CreatedAt() time.Time {
 	return t.createdAt
+}
+
+func (t *BaseTask) StartedAt() *time.Time {
+	p := atomic.LoadPointer(&t.startedAt)
+	return (*time.Time)(p)
+}
+
+func (t *BaseTask) SetStartedAt(startedAt time.Time) {
+	atomic.StorePointer(&t.startedAt, unsafe.Pointer(&startedAt))
 }
 
 func (t *BaseTask) String() string {

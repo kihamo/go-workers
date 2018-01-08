@@ -16,8 +16,8 @@ const (
 	TaskMetadataStatus MetadataKey = iota
 	TaskMetadataAttempts
 	TaskMetadataAllowStartAt
-	TaskMetadataStartedAt
-	TaskMetadataFinishedAt
+	TaskMetadataFirstStartedAt
+	TaskMetadataLastStartedAt
 )
 
 const (

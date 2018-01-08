@@ -29,9 +29,14 @@ type Task interface {
 	Run(context.Context) (interface{}, error)
 	Id() string
 	Name() string
+	// приоритет выполения, чем меньше значение тем приоритетнее в очереди задач
 	Priority() int64
 	Repeats() int64
-	Duration() time.Duration
+	// интервал между повторениями
+	RepeatInterval() time.Duration
+	// таймаут на выполнения задачи
 	Timeout() time.Duration
 	CreatedAt() time.Time
+	// для отложенного запуска
+	StartedAt() *time.Time
 }

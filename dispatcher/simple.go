@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/manager"
@@ -28,8 +29,9 @@ type SimpleDispatcher struct {
 	tasks     workers.Manager
 	listeners *manager.ListenersManager
 
-	allowExecuteTasks chan struct{}
-	results           chan SimpleDispatcherResult
+	allowExecuteTasks       chan struct{}
+	tickerAllowExecuteTasks *workers.Ticker
+	results                 chan SimpleDispatcherResult
 }
 
 func NewSimpleDispatcher() *SimpleDispatcher {
@@ -38,11 +40,12 @@ func NewSimpleDispatcher() *SimpleDispatcher {
 
 func NewSimpleDispatcherWithContext(ctx context.Context) *SimpleDispatcher {
 	d := &SimpleDispatcher{
-		workers:           manager.NewWorkersManager(),
-		tasks:             manager.NewTasksManager(),
-		listeners:         manager.NewListenersManager(),
-		allowExecuteTasks: make(chan struct{}, 1),
-		results:           make(chan SimpleDispatcherResult),
+		workers:                 manager.NewWorkersManager(),
+		tasks:                   manager.NewTasksManager(),
+		listeners:               manager.NewListenersManager(),
+		allowExecuteTasks:       make(chan struct{}, 1),
+		tickerAllowExecuteTasks: workers.NewTicker(time.Second),
+		results:                 make(chan SimpleDispatcherResult),
 	}
 
 	d.setStatusDispatcher(workers.DispatcherStatusWait)
@@ -246,6 +249,11 @@ func (d *SimpleDispatcher) doResultCollector() {
 				}
 
 				if repeats := result.taskItem.Task().Repeats(); repeats < 0 || result.taskItem.Attempts() < repeats {
+					repeatInterval := result.taskItem.Task().RepeatInterval()
+					if repeatInterval > 0 {
+						result.taskItem.SetAllowStartAt(time.Now().Add(repeatInterval))
+					}
+
 					d.setStatusTask(result.taskItem, workers.TaskStatusRepeatWait)
 					d.tasks.Push(result.taskItem)
 				} else {
@@ -287,7 +295,11 @@ func (d *SimpleDispatcher) doDispatch() {
 				// TODO: log else
 			}
 
+		case <-d.tickerAllowExecuteTasks.C():
+			d.notifyAllowExecuteTasks()
+
 		case <-d.ctx.Done():
+			d.tickerAllowExecuteTasks.Stop()
 			d.wg.Done()
 			return
 		}
@@ -305,6 +317,12 @@ func (d *SimpleDispatcher) doRunTask(workerItem *manager.WorkersManagerItem, tas
 
 	taskItem.SetAttempts(taskItem.Attempts() + 1)
 	d.setStatusTask(taskItem, workers.TaskStatusProcess)
+
+	now := time.Now()
+	if taskItem.Attempts() == 1 {
+		taskItem.SetFirstStartedAt(now)
+	}
+	taskItem.SetLastStartedAt(now)
 
 	ctx := workers.NewContextWithAttempt(d.ctx, taskItem.Attempts())
 
@@ -384,4 +402,8 @@ func (d *SimpleDispatcher) setStatusTask(task workers.ManagerItem, status worker
 	last := task.Status()
 	task.SetStatus(status)
 	d.listeners.AsyncTrigger(workers.EventIdTaskStatusChanged, task.(*manager.TasksManagerItem).Task(), status, last)
+}
+
+func (d *SimpleDispatcher) SetTickerExecuteTasksDuration(t time.Duration) {
+	d.tickerAllowExecuteTasks.SetDuration(t)
 }

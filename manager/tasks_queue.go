@@ -31,7 +31,7 @@ func (q *tasksQueue) Less(i, j int) bool {
 	}
 
 	if q.list[i].Task().Priority() == q.list[j].Task().Priority() {
-		return q.list[i].AllowStartAt().Before(q.list[j].AllowStartAt())
+		return q.list[i].AllowStartAt().Before(*q.list[j].AllowStartAt())
 	}
 
 	return q.list[i].Task().Priority() < q.list[j].Task().Priority()
