@@ -22,6 +22,7 @@ type BaseTask struct {
 
 func (t *BaseTask) Init() {
 	t.id = uuid.New().String()
+	t.repeats = 1
 	t.createdAt = time.Now()
 }
 
