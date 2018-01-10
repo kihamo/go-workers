@@ -14,20 +14,19 @@ type TasksManagerItem struct {
 	workers.ManagerItemBase
 	mutex sync.RWMutex
 
+	index          int64
 	attempts       int64
 	task           workers.Task
 	allowStartAt   unsafe.Pointer
 	firstStartedAt unsafe.Pointer
 	lastStartedAt  unsafe.Pointer
 
-	index  int64
 	cancel context.CancelFunc
 }
 
 func NewTasksManagerItem(task workers.Task, status workers.TaskStatus) *TasksManagerItem {
 	item := &TasksManagerItem{
-		task:  task,
-		index: -1,
+		task: task,
 	}
 
 	allowStartAt := time.Now()
@@ -36,6 +35,7 @@ func NewTasksManagerItem(task workers.Task, status workers.TaskStatus) *TasksMan
 		allowStartAt = *startedAt
 	}
 
+	item.setIndex(-1)
 	item.SetAllowStartAt(allowStartAt)
 	item.SetStatus(status)
 
