@@ -37,6 +37,7 @@ func (w *WorkersManagerItem) Metadata() workers.Metadata {
 	return workers.Metadata{
 		workers.WorkerMetadataStatus: w.Status(),
 		workers.WorkerMetadataTask:   w.Task(),
+		workers.WorkerMetadataLocked: w.IsLocked(),
 	}
 }
 

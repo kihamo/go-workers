@@ -57,6 +57,7 @@ func (t *TasksManagerItem) Metadata() workers.Metadata {
 		workers.TaskMetadataAllowStartAt:   t.AllowStartAt(),
 		workers.TaskMetadataFirstStartedAt: t.FirstStartedAt(),
 		workers.TaskMetadataLastStartedAt:  t.LastStartedAt(),
+		workers.TaskMetadataLocked:         t.IsLocked(),
 	}
 }
 

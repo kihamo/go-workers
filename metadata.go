@@ -10,6 +10,7 @@ const (
 const (
 	WorkerMetadataStatus MetadataKey = iota
 	WorkerMetadataTask
+	WorkerMetadataLocked
 )
 
 const (
@@ -18,6 +19,7 @@ const (
 	TaskMetadataAllowStartAt
 	TaskMetadataFirstStartedAt
 	TaskMetadataLastStartedAt
+	TaskMetadataLocked
 )
 
 const (
