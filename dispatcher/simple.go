@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"context"
 	"errors"
+	"log"
 	"sync"
 	"time"
 
@@ -243,7 +244,9 @@ func (d *SimpleDispatcher) doResultCollector() {
 
 			if !result.cancel || !result.workerItem.IsStatus(workers.WorkerStatusCancel) {
 				d.setStatusWorker(result.workerItem, workers.WorkerStatusWait)
-				d.workers.Push(result.workerItem)
+				if err := d.workers.Push(result.workerItem); err != nil {
+					log.Printf("Push worker failed with error: %s", err.Error())
+				}
 			}
 
 			if !result.cancel || !result.taskItem.IsStatus(workers.TaskStatusCancel) {
@@ -260,7 +263,9 @@ func (d *SimpleDispatcher) doResultCollector() {
 					}
 
 					d.setStatusTask(result.taskItem, workers.TaskStatusRepeatWait)
-					d.tasks.Push(result.taskItem)
+					if err := d.tasks.Push(result.taskItem); err != nil {
+						log.Printf("Push task failed with error: %s", err.Error())
+					}
 				} else {
 					d.tasks.Remove(result.taskItem)
 				}
