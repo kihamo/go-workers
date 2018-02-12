@@ -49,7 +49,7 @@ func (l *ListenersManagerItem) EventIdIsAllowed(eventId workers.EventId) bool {
 	defer l.mutex.RUnlock()
 
 	for _, id := range l.eventIds {
-		if id.Int64() == eventId.Int64() {
+		if id == eventId {
 			return true
 		}
 	}
@@ -62,7 +62,7 @@ func (l *ListenersManagerItem) AddEventId(eventId workers.EventId) {
 	defer l.mutex.Unlock()
 
 	for _, id := range l.eventIds {
-		if id.Int64() == eventId.Int64() {
+		if id == eventId {
 			return
 		}
 	}
@@ -75,7 +75,7 @@ func (l *ListenersManagerItem) RemoveEventId(eventId workers.EventId) {
 	defer l.mutex.Unlock()
 
 	for i := len(l.eventIds) - 1; i >= 0; i-- {
-		if l.eventIds[i].Int64() == eventId.Int64() {
+		if l.eventIds[i] == eventId {
 			l.eventIds = append(l.eventIds[:i], l.eventIds[i+1:]...)
 			break
 		}
