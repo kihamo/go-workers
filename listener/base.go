@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 )
 
 type BaseListener struct {
@@ -13,7 +13,7 @@ type BaseListener struct {
 }
 
 func (t *BaseListener) Init() {
-	t.id = uuid.New().String()
+	t.id = uuid.New()
 }
 
 func (t *BaseListener) Id() string {

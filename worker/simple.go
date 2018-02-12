@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/kihamo/go-workers"
+	"github.com/pborman/uuid"
 )
 
 type SimpleWorker struct {
@@ -16,7 +16,7 @@ type SimpleWorker struct {
 
 func NewSimpleWorker() *SimpleWorker {
 	return &SimpleWorker{
-		id:        uuid.New().String(),
+		id:        uuid.New(),
 		createdAt: time.Now(),
 	}
 }

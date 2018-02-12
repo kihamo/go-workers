@@ -6,7 +6,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/google/uuid"
+	"github.com/pborman/uuid"
 )
 
 type BaseTask struct {
@@ -21,7 +21,7 @@ type BaseTask struct {
 }
 
 func (t *BaseTask) Init() {
-	t.id = uuid.New().String()
+	t.id = uuid.New()
 	t.repeats = 1
 	t.createdAt = time.Now()
 }

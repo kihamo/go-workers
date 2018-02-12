@@ -7,8 +7,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/google/uuid"
 	"github.com/kihamo/go-workers"
+	"github.com/pborman/uuid"
 )
 
 type ListenersManagerItem struct {
@@ -23,7 +23,7 @@ type ListenersManagerItem struct {
 
 func NewListenersManagerItem(eventId workers.EventId, listener workers.Listener) *ListenersManagerItem {
 	return &ListenersManagerItem{
-		id:       uuid.New().String(),
+		id:       uuid.New(),
 		eventIds: []workers.EventId{eventId},
 		listener: listener,
 	}
