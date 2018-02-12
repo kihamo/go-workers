@@ -8,7 +8,8 @@ import (
 type EventId int64
 
 const (
-	EventIdDispatcherStatusChanged EventId = iota
+	EventIdAll EventId = iota
+	EventIdDispatcherStatusChanged
 	EventIdWorkerAdd
 	EventIdWorkerRemove
 	EventIdWorkerExecuteStart

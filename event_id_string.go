@@ -4,9 +4,9 @@ package workers
 
 import "strconv"
 
-const _EventId_name = "DispatcherStatusChangedWorkerAddWorkerRemoveWorkerExecuteStartWorkerExecuteStopWorkerStatusChangedTaskAddTaskRemoveTaskExecuteStartTaskExecuteStopTaskStatusChangedListenerAddListenerRemove"
+const _EventId_name = "AllDispatcherStatusChangedWorkerAddWorkerRemoveWorkerExecuteStartWorkerExecuteStopWorkerStatusChangedTaskAddTaskRemoveTaskExecuteStartTaskExecuteStopTaskStatusChangedListenerAddListenerRemove"
 
-var _EventId_index = [...]uint8{0, 23, 32, 44, 62, 79, 98, 105, 115, 131, 146, 163, 174, 188}
+var _EventId_index = [...]uint8{0, 3, 26, 35, 47, 65, 82, 101, 108, 118, 134, 149, 166, 177, 191}
 
 func (i EventId) String() string {
 	if i < 0 || i >= EventId(len(_EventId_index)-1) {

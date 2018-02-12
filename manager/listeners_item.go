@@ -14,6 +14,7 @@ import (
 type ListenersManagerItem struct {
 	mutex       sync.RWMutex
 	fires       int64
+	eventAll    bool
 	eventIds    []workers.EventId
 	listener    workers.Listener
 	id          string
@@ -22,12 +23,14 @@ type ListenersManagerItem struct {
 }
 
 func NewListenersManagerItem(eventId workers.EventId, listener workers.Listener) *ListenersManagerItem {
-	return &ListenersManagerItem{
+	item := &ListenersManagerItem{
 		id:       uuid.New(),
-		eventIds: []workers.EventId{eventId},
+		eventIds: []workers.EventId{},
 		listener: listener,
 	}
+	item.AddEventId(eventId)
 
+	return item
 }
 
 func (l *ListenersManagerItem) Id() string {
@@ -48,6 +51,10 @@ func (l *ListenersManagerItem) EventIdIsAllowed(eventId workers.EventId) bool {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 
+	if l.eventAll {
+		return true
+	}
+
 	for _, id := range l.eventIds {
 		if id == eventId {
 			return true
@@ -61,6 +68,10 @@ func (l *ListenersManagerItem) AddEventId(eventId workers.EventId) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 
+	if eventId == workers.EventIdAll {
+		l.eventAll = true
+	}
+
 	for _, id := range l.eventIds {
 		if id == eventId {
 			return
@@ -73,6 +84,10 @@ func (l *ListenersManagerItem) AddEventId(eventId workers.EventId) {
 func (l *ListenersManagerItem) RemoveEventId(eventId workers.EventId) {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+
+	if eventId == workers.EventIdAll {
+		l.eventAll = false
+	}
 
 	for i := len(l.eventIds) - 1; i >= 0; i-- {
 		if l.eventIds[i] == eventId {
