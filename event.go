@@ -1,6 +1,8 @@
 package workers
 
 import (
+	"fmt"
+
 	"github.com/kihamo/go-workers/event"
 )
 
@@ -22,6 +24,9 @@ var (
 )
 
 type Event interface {
+	fmt.Stringer
+	fmt.GoStringer
+
 	Id() string
 	Name() string
 }

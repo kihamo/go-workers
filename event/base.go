@@ -11,8 +11,6 @@ type BaseEvent struct {
 	name string
 }
 
-type Event BaseEvent
-
 func NewBaseEvent(name string) *BaseEvent {
 	return &BaseEvent{
 		id:   uuid.New(),
