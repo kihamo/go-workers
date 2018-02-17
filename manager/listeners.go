@@ -10,13 +10,13 @@ import (
 
 type ListenersManager struct {
 	mutex     sync.RWMutex
-	events    map[workers.EventId][]*ListenersManagerItem
+	events    map[workers.Event][]*ListenersManagerItem
 	listeners map[string]*ListenersManagerItem
 }
 
 func NewListenersManager() *ListenersManager {
 	return &ListenersManager{
-		events:    map[workers.EventId][]*ListenersManagerItem{},
+		events:    map[workers.Event][]*ListenersManagerItem{},
 		listeners: map[string]*ListenersManagerItem{},
 	}
 }
@@ -40,7 +40,7 @@ func (m *ListenersManager) GetById(id string) *ListenersManagerItem {
 	return m.listeners[id]
 }
 
-func (m *ListenersManager) Attach(eventId workers.EventId, listener workers.Listener) {
+func (m *ListenersManager) Attach(eventId workers.Event, listener workers.Listener) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -48,7 +48,7 @@ func (m *ListenersManager) Attach(eventId workers.EventId, listener workers.List
 	if !ok {
 		item = NewListenersManagerItem(eventId, listener)
 	}
-	item.AddEventId(eventId)
+	item.AddEvent(eventId)
 
 	if _, ok := m.events[eventId]; !ok {
 		m.events[eventId] = []*ListenersManagerItem{item}
@@ -59,7 +59,7 @@ func (m *ListenersManager) Attach(eventId workers.EventId, listener workers.List
 	m.listeners[listener.Id()] = item
 }
 
-func (m *ListenersManager) DeAttach(eventId workers.EventId, listener workers.Listener) {
+func (m *ListenersManager) DeAttach(eventId workers.Event, listener workers.Listener) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -78,13 +78,13 @@ func (m *ListenersManager) DeAttach(eventId workers.EventId, listener workers.Li
 		}
 	}
 
-	item.RemoveEventId(eventId)
-	if len(item.EventIds()) == 0 {
+	item.RemoveEvent(eventId)
+	if len(item.Events()) == 0 {
 		delete(m.listeners, listener.Id())
 	}
 }
 
-func (m *ListenersManager) Trigger(eventId workers.EventId, args ...interface{}) {
+func (m *ListenersManager) Trigger(eventId workers.Event, args ...interface{}) {
 	listeners := m.listenersForEvent(eventId)
 	if len(listeners) == 0 {
 		return
@@ -98,7 +98,7 @@ func (m *ListenersManager) Trigger(eventId workers.EventId, args ...interface{})
 	}
 }
 
-func (m *ListenersManager) AsyncTrigger(eventId workers.EventId, args ...interface{}) {
+func (m *ListenersManager) AsyncTrigger(eventId workers.Event, args ...interface{}) {
 	listeners := m.listenersForEvent(eventId)
 
 	if len(listeners) == 0 {
@@ -115,7 +115,7 @@ func (m *ListenersManager) AsyncTrigger(eventId workers.EventId, args ...interfa
 	}
 }
 
-func (m *ListenersManager) listenersForEvent(eventId workers.EventId) []*ListenersManagerItem {
+func (m *ListenersManager) listenersForEvent(eventId workers.Event) []*ListenersManagerItem {
 	listeners := make([]*ListenersManagerItem, 0, len(m.listeners))
 
 	m.mutex.RLock()
@@ -126,12 +126,12 @@ func (m *ListenersManager) listenersForEvent(eventId workers.EventId) []*Listene
 		listeners = listenersByEvent
 	}
 
-	if eventId == workers.EventIdAll {
+	if eventId == workers.EventAll {
 		return listeners
 	}
 
 	m.mutex.RLock()
-	listenersAll, okAll := m.events[workers.EventIdAll]
+	listenersAll, okAll := m.events[workers.EventAll]
 	m.mutex.RUnlock()
 
 	if okAll {

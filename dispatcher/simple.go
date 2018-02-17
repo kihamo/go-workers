@@ -114,7 +114,7 @@ func (d *SimpleDispatcher) AddWorker(worker workers.Worker) error {
 		return err
 	}
 
-	d.listeners.AsyncTrigger(workers.EventIdWorkerAdd, worker, item.Metadata())
+	d.listeners.AsyncTrigger(workers.EventWorkerAdd, worker, item.Metadata())
 	d.notifyAllowExecuteTasks()
 	return nil
 }
@@ -129,7 +129,7 @@ func (d *SimpleDispatcher) RemoveWorker(worker workers.Worker) {
 		workerItem.SetTask(nil)
 
 		d.workers.Remove(item)
-		d.listeners.AsyncTrigger(workers.EventIdWorkerRemove, workerItem.Worker(), workerItem.Metadata())
+		d.listeners.AsyncTrigger(workers.EventWorkerRemove, workerItem.Worker(), workerItem.Metadata())
 	}
 
 	return
@@ -161,7 +161,7 @@ func (d *SimpleDispatcher) AddTask(task workers.Task) error {
 		return err
 	}
 
-	d.listeners.AsyncTrigger(workers.EventIdTaskAdd, task, item.Metadata())
+	d.listeners.AsyncTrigger(workers.EventTaskAdd, task, item.Metadata())
 	d.notifyAllowExecuteTasks()
 	return nil
 }
@@ -175,7 +175,7 @@ func (d *SimpleDispatcher) RemoveTask(task workers.Task) {
 		taskItem.Cancel()
 
 		d.tasks.Remove(item)
-		d.listeners.AsyncTrigger(workers.EventIdTaskRemove, taskItem.Task(), taskItem.Metadata())
+		d.listeners.AsyncTrigger(workers.EventTaskRemove, taskItem.Task(), taskItem.Metadata())
 	}
 
 	return
@@ -200,18 +200,18 @@ func (d *SimpleDispatcher) GetTasks() []workers.Task {
 	return collection
 }
 
-func (d *SimpleDispatcher) AddListener(eventId workers.EventId, listener workers.Listener) error {
+func (d *SimpleDispatcher) AddListener(eventId workers.Event, listener workers.Listener) error {
 	d.listeners.Attach(eventId, listener)
-	d.listeners.AsyncTrigger(workers.EventIdListenerAdd, eventId, listener, d.GetListenerMetadata(listener.Id()))
+	d.listeners.AsyncTrigger(workers.EventListenerAdd, eventId, listener, d.GetListenerMetadata(listener.Id()))
 
 	return nil
 }
 
-func (d *SimpleDispatcher) RemoveListener(eventId workers.EventId, listener workers.Listener) {
+func (d *SimpleDispatcher) RemoveListener(eventId workers.Event, listener workers.Listener) {
 	item := d.listeners.GetById(listener.Id())
 	if item != nil {
 		d.listeners.DeAttach(eventId, listener)
-		d.listeners.AsyncTrigger(workers.EventIdListenerRemove, eventId, listener, item.Metadata())
+		d.listeners.AsyncTrigger(workers.EventListenerRemove, eventId, listener, item.Metadata())
 	}
 }
 
@@ -271,7 +271,7 @@ func (d *SimpleDispatcher) doResultCollector() {
 				}
 			}
 
-			d.listeners.AsyncTrigger(workers.EventIdTaskExecuteStop, result.taskItem.Task(), result.taskItem.Metadata(), result.workerItem.Worker(), result.workerItem.Metadata(), result.result, result.err)
+			d.listeners.AsyncTrigger(workers.EventTaskExecuteStop, result.taskItem.Task(), result.taskItem.Metadata(), result.workerItem.Worker(), result.workerItem.Metadata(), result.result, result.err)
 			d.notifyAllowExecuteTasks()
 
 		case <-d.ctx.Done():
@@ -299,7 +299,7 @@ func (d *SimpleDispatcher) doDispatch() {
 					castWorker := pullWorker.(*manager.WorkersManagerItem)
 					castTask := pullTask.(*manager.TasksManagerItem)
 
-					d.listeners.AsyncTrigger(workers.EventIdTaskExecuteStart, castTask.Task(), castTask.Metadata(), castWorker.Worker(), castWorker.Metadata())
+					d.listeners.AsyncTrigger(workers.EventTaskExecuteStart, castTask.Task(), castTask.Metadata(), castWorker.Worker(), castWorker.Metadata())
 					go d.doRunTask(castWorker, castTask)
 				}
 				// TODO: log else
@@ -399,21 +399,21 @@ func (d *SimpleDispatcher) notifyAllowExecuteTasks() {
 func (d *SimpleDispatcher) setStatusDispatcher(status workers.Status) {
 	last := d.Status()
 	d.StatusItemBase.SetStatus(status)
-	d.listeners.AsyncTrigger(workers.EventIdDispatcherStatusChanged, d, status, last)
+	d.listeners.AsyncTrigger(workers.EventDispatcherStatusChanged, d, status, last)
 }
 
 func (d *SimpleDispatcher) setStatusWorker(worker workers.ManagerItem, status workers.Status) {
 	last := worker.Status()
 	worker.SetStatus(status)
 	item := worker.(*manager.WorkersManagerItem)
-	d.listeners.AsyncTrigger(workers.EventIdWorkerStatusChanged, item.Worker(), item.Metadata(), status, last)
+	d.listeners.AsyncTrigger(workers.EventWorkerStatusChanged, item.Worker(), item.Metadata(), status, last)
 }
 
 func (d *SimpleDispatcher) setStatusTask(task workers.ManagerItem, status workers.Status) {
 	last := task.Status()
 	task.SetStatus(status)
 	item := task.(*manager.TasksManagerItem)
-	d.listeners.AsyncTrigger(workers.EventIdTaskStatusChanged, item.Task(), item.Metadata(), status, last)
+	d.listeners.AsyncTrigger(workers.EventTaskStatusChanged, item.Task(), item.Metadata(), status, last)
 }
 
 func (d *SimpleDispatcher) SetTickerExecuteTasksDuration(t time.Duration) {

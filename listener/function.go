@@ -10,10 +10,10 @@ import (
 type FunctionListener struct {
 	BaseListener
 
-	function func(context.Context, workers.EventId, time.Time, ...interface{})
+	function func(context.Context, workers.Event, time.Time, ...interface{})
 }
 
-func NewFunctionListener(function func(context.Context, workers.EventId, time.Time, ...interface{})) *FunctionListener {
+func NewFunctionListener(function func(context.Context, workers.Event, time.Time, ...interface{})) *FunctionListener {
 	t := &FunctionListener{
 		function: function,
 	}
@@ -22,7 +22,7 @@ func NewFunctionListener(function func(context.Context, workers.EventId, time.Ti
 	return t
 }
 
-func (l *FunctionListener) Run(ctx context.Context, eventId workers.EventId, t time.Time, args ...interface{}) {
+func (l *FunctionListener) Run(ctx context.Context, eventId workers.Event, t time.Time, args ...interface{}) {
 	l.function(ctx, eventId, t, args...)
 }
 

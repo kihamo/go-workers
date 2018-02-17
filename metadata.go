@@ -26,7 +26,7 @@ const (
 	ListenerMetadataFires MetadataKey = iota
 	ListenerMetadataFirstFiredAt
 	ListenerMetadataLastFireAt
-	ListenerMetadataEventIds
+	ListenerMetadataEvents
 )
 
 type Metadata map[MetadataKey]interface{}

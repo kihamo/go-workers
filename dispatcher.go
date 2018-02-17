@@ -38,8 +38,8 @@ type Dispatcher interface {
 	GetTaskMetadata(string) Metadata
 	GetTasks() []Task
 
-	AddListener(EventId, Listener) error
-	RemoveListener(EventId, Listener)
+	AddListener(Event, Listener) error
+	RemoveListener(Event, Listener)
 	GetListenerMetadata(string) Metadata
 	GetListeners() []Listener
 }
