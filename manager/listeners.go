@@ -21,6 +21,26 @@ func NewListenersManager() *ListenersManager {
 	}
 }
 
+func (m *ListenersManager) AddListener(listener workers.ListenerWithEvents) {
+	events := listener.Events()
+
+	if len(events) > 0 {
+		for _, event := range events {
+			m.Attach(event, listener)
+		}
+	}
+}
+
+func (m *ListenersManager) RemoveListener(listener workers.ListenerWithEvents) {
+	events := listener.Events()
+
+	if len(events) > 0 {
+		for _, event := range events {
+			m.DeAttach(event, listener)
+		}
+	}
+}
+
 func (m *ListenersManager) Listeners() []workers.Listener {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -40,30 +60,43 @@ func (m *ListenersManager) GetById(id string) *ListenersManagerItem {
 	return m.listeners[id]
 }
 
-func (m *ListenersManager) Attach(eventId workers.Event, listener workers.Listener) {
+func (m *ListenersManager) GetEventById(id string) workers.Event {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	for event := range m.events {
+		if event.Id() == id {
+			return event
+		}
+	}
+
+	return nil
+}
+
+func (m *ListenersManager) Attach(event workers.Event, listener workers.Listener) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	item, ok := m.listeners[listener.Id()]
 	if !ok {
-		item = NewListenersManagerItem(eventId, listener)
+		item = NewListenersManagerItem(event, listener)
 	}
-	item.AddEvent(eventId)
+	item.AddEvent(event)
 
-	if _, ok := m.events[eventId]; !ok {
-		m.events[eventId] = []*ListenersManagerItem{item}
+	if _, ok := m.events[event]; !ok {
+		m.events[event] = []*ListenersManagerItem{item}
 	} else {
-		m.events[eventId] = append(m.events[eventId], item)
+		m.events[event] = append(m.events[event], item)
 	}
 
 	m.listeners[listener.Id()] = item
 }
 
-func (m *ListenersManager) DeAttach(eventId workers.Event, listener workers.Listener) {
+func (m *ListenersManager) DeAttach(event workers.Event, listener workers.Listener) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if _, ok := m.events[eventId]; !ok {
+	if _, ok := m.events[event]; !ok {
 		return
 	}
 
@@ -72,20 +105,20 @@ func (m *ListenersManager) DeAttach(eventId workers.Event, listener workers.List
 		return
 	}
 
-	for i := len(m.events[eventId]) - 1; i >= 0; i-- {
-		if m.events[eventId][i].Listener() == listener {
-			m.events[eventId] = append(m.events[eventId][:i], m.events[eventId][i+1:]...)
+	for i := len(m.events[event]) - 1; i >= 0; i-- {
+		if m.events[event][i].Listener() == listener {
+			m.events[event] = append(m.events[event][:i], m.events[event][i+1:]...)
 		}
 	}
 
-	item.RemoveEvent(eventId)
+	item.RemoveEvent(event)
 	if len(item.Events()) == 0 {
 		delete(m.listeners, listener.Id())
 	}
 }
 
-func (m *ListenersManager) Trigger(eventId workers.Event, args ...interface{}) {
-	listeners := m.listenersForEvent(eventId)
+func (m *ListenersManager) Trigger(event workers.Event, args ...interface{}) {
+	listeners := m.listenersForEvent(event)
 	if len(listeners) == 0 {
 		return
 	}
@@ -94,12 +127,12 @@ func (m *ListenersManager) Trigger(eventId workers.Event, args ...interface{}) {
 	ctx := context.TODO()
 
 	for _, item := range listeners {
-		item.Fire(ctx, eventId, now, args...)
+		item.Fire(ctx, event, now, args...)
 	}
 }
 
-func (m *ListenersManager) AsyncTrigger(eventId workers.Event, args ...interface{}) {
-	listeners := m.listenersForEvent(eventId)
+func (m *ListenersManager) AsyncTrigger(event workers.Event, args ...interface{}) {
+	listeners := m.listenersForEvent(event)
 
 	if len(listeners) == 0 {
 		return
@@ -110,23 +143,23 @@ func (m *ListenersManager) AsyncTrigger(eventId workers.Event, args ...interface
 
 	for _, item := range listeners {
 		go func(ctx context.Context, i *ListenersManagerItem) {
-			i.Fire(ctx, eventId, now, args...)
+			i.Fire(ctx, event, now, args...)
 		}(ctx, item)
 	}
 }
 
-func (m *ListenersManager) listenersForEvent(eventId workers.Event) []*ListenersManagerItem {
+func (m *ListenersManager) listenersForEvent(event workers.Event) []*ListenersManagerItem {
 	listeners := make([]*ListenersManagerItem, 0, len(m.listeners))
 
 	m.mutex.RLock()
-	listenersByEvent, okByEvent := m.events[eventId]
+	listenersByEvent, okByEvent := m.events[event]
 	m.mutex.RUnlock()
 
 	if okByEvent {
 		listeners = listenersByEvent
 	}
 
-	if eventId == workers.EventAll {
+	if event == workers.EventAll {
 		return listeners
 	}
 

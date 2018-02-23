@@ -10,3 +10,9 @@ type Listener interface {
 	Id() string
 	Name() string
 }
+
+type ListenerWithEvents interface {
+	Listener
+
+	Events() []Event
+}

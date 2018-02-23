@@ -22,13 +22,13 @@ type ListenersManagerItem struct {
 	lastFireAt  unsafe.Pointer
 }
 
-func NewListenersManagerItem(eventId workers.Event, listener workers.Listener) *ListenersManagerItem {
+func NewListenersManagerItem(event workers.Event, listener workers.Listener) *ListenersManagerItem {
 	item := &ListenersManagerItem{
 		id:       uuid.New(),
 		events:   []workers.Event{},
 		listener: listener,
 	}
-	item.AddEvent(eventId)
+	item.AddEvent(event)
 
 	return item
 }
@@ -47,7 +47,7 @@ func (l *ListenersManagerItem) Events() []workers.Event {
 	return tmp
 }
 
-func (l *ListenersManagerItem) EventIsAllowed(eventId workers.Event) bool {
+func (l *ListenersManagerItem) EventIsAllowed(event workers.Event) bool {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 
@@ -56,7 +56,7 @@ func (l *ListenersManagerItem) EventIsAllowed(eventId workers.Event) bool {
 	}
 
 	for _, id := range l.events {
-		if id == eventId {
+		if id == event {
 			return true
 		}
 	}
@@ -101,8 +101,8 @@ func (l *ListenersManagerItem) Listener() workers.Listener {
 	return l.listener
 }
 
-func (l *ListenersManagerItem) Fire(ctx context.Context, eventId workers.Event, t time.Time, args ...interface{}) {
-	if !l.EventIsAllowed(eventId) {
+func (l *ListenersManagerItem) Fire(ctx context.Context, event workers.Event, t time.Time, args ...interface{}) {
+	if !l.EventIsAllowed(event) {
 		return
 	}
 
@@ -115,7 +115,7 @@ func (l *ListenersManagerItem) Fire(ctx context.Context, eventId workers.Event, 
 		atomic.StorePointer(&l.firstFireAt, unsafe.Pointer(&now))
 	}
 
-	l.listener.Run(ctx, eventId, t, args...)
+	l.listener.Run(ctx, event, t, args...)
 }
 
 func (l *ListenersManagerItem) Metadata() workers.Metadata {

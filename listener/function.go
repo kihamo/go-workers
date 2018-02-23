@@ -22,8 +22,8 @@ func NewFunctionListener(function func(context.Context, workers.Event, time.Time
 	return t
 }
 
-func (l *FunctionListener) Run(ctx context.Context, eventId workers.Event, t time.Time, args ...interface{}) {
-	l.function(ctx, eventId, t, args...)
+func (l *FunctionListener) Run(ctx context.Context, event workers.Event, t time.Time, args ...interface{}) {
+	l.function(ctx, event, t, args...)
 }
 
 func (l *FunctionListener) Name() string {
