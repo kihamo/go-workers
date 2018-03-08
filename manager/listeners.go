@@ -149,9 +149,8 @@ func (m *ListenersManager) AsyncTrigger(event workers.Event, args ...interface{}
 }
 
 func (m *ListenersManager) listenersForEvent(event workers.Event) []*ListenersManagerItem {
-	listeners := make([]*ListenersManagerItem, 0, len(m.listeners))
-
 	m.mutex.RLock()
+	listeners := make([]*ListenersManagerItem, 0, len(m.listeners))
 	listenersByEvent, okByEvent := m.events[event]
 	m.mutex.RUnlock()
 
