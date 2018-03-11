@@ -6,5 +6,4 @@ type Manager interface {
 	Remove(ManagerItem)
 	GetById(string) ManagerItem
 	GetAll() []ManagerItem
-	UnlockedCount() uint64
 }

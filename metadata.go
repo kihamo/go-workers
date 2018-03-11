@@ -3,8 +3,7 @@ package workers
 type MetadataKey int64
 
 const (
-	DispatcherMetadataWorkersUnlocked MetadataKey = iota
-	DispatcherMetadataTasksUnlocked
+	DispatcherMetadataStatus MetadataKey = iota
 )
 
 const (

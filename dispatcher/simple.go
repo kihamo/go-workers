@@ -94,8 +94,7 @@ func (d *SimpleDispatcher) Cancel() error {
 
 func (d *SimpleDispatcher) Metadata() workers.Metadata {
 	return workers.Metadata{
-		workers.DispatcherMetadataWorkersUnlocked: d.workers.UnlockedCount(),
-		workers.DispatcherMetadataTasksUnlocked:   d.tasks.UnlockedCount(),
+		workers.DispatcherMetadataStatus: d.Status(),
 	}
 }
 
@@ -291,10 +290,7 @@ func (d *SimpleDispatcher) doDispatch() {
 				continue
 			}
 
-			taskUnlocked := d.tasks.UnlockedCount()
-			workerUnlocked := d.workers.UnlockedCount()
-
-			for taskUnlocked > 0 && workerUnlocked > 0 {
+			for {
 				pullWorker := d.workers.Pull()
 				pullTask := d.tasks.Pull()
 
@@ -307,19 +303,14 @@ func (d *SimpleDispatcher) doDispatch() {
 				} else {
 					if pullWorker != nil {
 						d.workers.Push(pullWorker)
-					} else {
-						log.Printf("Dispatch with %d tasks unlocked and %d workers unlocked, but worker manager pull returns nil", taskUnlocked, workerUnlocked)
 					}
 
 					if pullTask != nil {
 						d.tasks.Push(pullTask)
-					} else {
-						log.Printf("Dispatch with %d tasks unlocked and %d workers unlocked, but task manager pull returns nil", taskUnlocked, workerUnlocked)
 					}
-				}
 
-				taskUnlocked = d.tasks.UnlockedCount()
-				workerUnlocked = d.workers.UnlockedCount()
+					break
+				}
 			}
 
 		case <-d.tickerAllowExecuteTasks.C():

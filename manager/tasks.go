@@ -54,7 +54,7 @@ func (m *TasksManager) Push(task workers.ManagerItem) error {
 }
 
 func (m *TasksManager) Pull() workers.ManagerItem {
-	if m.UnlockedCount() < 1 {
+	if atomic.LoadUint64(&m.unlockedCounts) < 1 {
 		return nil
 	}
 
@@ -62,7 +62,7 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 	defer m.mutex.Unlock()
 
 	var ret workers.ManagerItem
-	forReturn := []workers.ManagerItem{}
+	forReturn := make([]workers.ManagerItem, 0, m.queue.Len())
 
 	for item := heap.Pop(m.queue); item != nil; item = heap.Pop(m.queue) {
 		mItem := item.(workers.ManagerItem)
@@ -122,10 +122,6 @@ func (m *TasksManager) GetAll() []workers.ManagerItem {
 	}
 
 	return collection
-}
-
-func (m *TasksManager) UnlockedCount() uint64 {
-	return atomic.LoadUint64(&m.unlockedCounts)
 }
 
 // пересчитывает количество не заблокированных задач, так как оно меняется произвольно из-за отложенной даты запуска

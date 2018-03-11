@@ -55,7 +55,7 @@ func (m *WorkersManager) Push(worker workers.ManagerItem) error {
 }
 
 func (m *WorkersManager) Pull() (worker workers.ManagerItem) {
-	if m.UnlockedCount() < 1 {
+	if atomic.LoadUint64(&m.unlockedCounts) < 1 {
 		return nil
 	}
 
@@ -115,8 +115,4 @@ func (m *WorkersManager) GetAll() []workers.ManagerItem {
 	}
 
 	return collection
-}
-
-func (m *WorkersManager) UnlockedCount() uint64 {
-	return atomic.LoadUint64(&m.unlockedCounts)
 }
