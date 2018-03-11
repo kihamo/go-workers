@@ -291,7 +291,10 @@ func (d *SimpleDispatcher) doDispatch() {
 				continue
 			}
 
-			for d.tasks.UnlockedCount() > 0 && d.workers.UnlockedCount() > 0 {
+			taskUnlocked := d.tasks.UnlockedCount()
+			workerUnlocked := d.workers.UnlockedCount()
+
+			for taskUnlocked > 0 && workerUnlocked > 0 {
 				pullWorker := d.workers.Pull()
 				pullTask := d.tasks.Pull()
 
@@ -301,8 +304,22 @@ func (d *SimpleDispatcher) doDispatch() {
 
 					d.listeners.AsyncTrigger(workers.EventTaskExecuteStart, castTask.Task(), castTask.Metadata(), castWorker.Worker(), castWorker.Metadata())
 					go d.doRunTask(castWorker, castTask)
+				} else {
+					if pullWorker != nil {
+						d.workers.Push(pullWorker)
+					} else {
+						log.Printf("Dispatch with %d tasks unlocked and %d workers unlocked, but worker manager pull returns nil", taskUnlocked, workerUnlocked)
+					}
+
+					if pullTask != nil {
+						d.tasks.Push(pullTask)
+					} else {
+						log.Printf("Dispatch with %d tasks unlocked and %d workers unlocked, but task manager pull returns nil", taskUnlocked, workerUnlocked)
+					}
 				}
-				// TODO: log else
+
+				taskUnlocked = d.tasks.UnlockedCount()
+				workerUnlocked = d.workers.UnlockedCount()
 			}
 
 		case <-d.tickerAllowExecuteTasks.C():
