@@ -21,6 +21,8 @@ type SimpleDispatcherResult struct {
 
 type SimpleDispatcher struct {
 	wg sync.WaitGroup
+
+	_ [4]byte // atomic requires 64-bit alignment for struct field access
 	workers.StatusItemBase
 
 	ctx       context.Context
