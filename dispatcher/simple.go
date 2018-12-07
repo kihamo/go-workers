@@ -115,7 +115,7 @@ func (d *SimpleDispatcher) AddWorker(worker workers.Worker) error {
 		return err
 	}
 
-	d.listeners.AsyncTrigger(d.Context(), woworkers.EventWorkerAdd, worker, item.Metadata())
+	d.listeners.AsyncTrigger(d.Context(), workers.EventWorkerAdd, worker, item.Metadata())
 	d.notifyAllowExecuteTasks()
 	return nil
 }
