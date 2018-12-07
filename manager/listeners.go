@@ -117,21 +117,20 @@ func (m *ListenersManager) DeAttach(event workers.Event, listener workers.Listen
 	}
 }
 
-func (m *ListenersManager) Trigger(event workers.Event, args ...interface{}) {
+func (m *ListenersManager) Trigger(ctx context.Context, event workers.Event, args ...interface{}) {
 	listeners := m.listenersForEvent(event)
 	if len(listeners) == 0 {
 		return
 	}
 
 	now := time.Now()
-	ctx := context.TODO()
 
 	for _, item := range listeners {
 		item.Fire(ctx, event, now, args...)
 	}
 }
 
-func (m *ListenersManager) AsyncTrigger(event workers.Event, args ...interface{}) {
+func (m *ListenersManager) AsyncTrigger(ctx context.Context, event workers.Event, args ...interface{}) {
 	listeners := m.listenersForEvent(event)
 
 	if len(listeners) == 0 {
@@ -139,12 +138,11 @@ func (m *ListenersManager) AsyncTrigger(event workers.Event, args ...interface{}
 	}
 
 	now := time.Now()
-	ctx := context.TODO()
 
 	for _, item := range listeners {
-		go func(ctx context.Context, i *ListenersManagerItem) {
+		go func(i *ListenersManagerItem) {
 			i.Fire(ctx, event, now, args...)
-		}(ctx, item)
+		}(item)
 	}
 }
 
