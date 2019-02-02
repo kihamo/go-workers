@@ -9,7 +9,7 @@ import (
 )
 
 type Ticker struct {
-	started atomic.Value
+	started uint32
 
 	c      chan time.Time
 	change chan time.Duration
@@ -31,20 +31,18 @@ func NewTicker(d time.Duration) *Ticker {
 		ticker: c.NewTicker(d),
 	}
 
-	t.started.Store(false)
-
 	return t
 }
 
 func (t *Ticker) run() {
-	t.started.Store(true)
+	atomic.StoreUint32(&t.started, 1)
 
 	for {
 		select {
 		case <-t.stop:
 			if t.IsStart() {
 				t.ticker.Stop()
-				t.started.Store(false)
+				atomic.StoreUint32(&t.started, 0)
 			}
 
 			return
@@ -68,7 +66,7 @@ func (t *Ticker) SetDuration(d time.Duration) {
 }
 
 func (t *Ticker) IsStart() bool {
-	return t.started.Load().(bool)
+	return atomic.LoadUint32(&t.started) == 1
 }
 
 func (t *Ticker) Start() {

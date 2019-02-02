@@ -14,7 +14,7 @@ const (
 )
 
 func (i DispatcherStatus) Int64() int64 {
-	if i < 0 || i >= DispatcherStatus(len(_DispatcherStatus_index)-1) {
+	if i < 0 || i >= DispatcherStatus(len(_DispatcherStatusIndex)-1) {
 		return -1
 	}
 

@@ -15,7 +15,7 @@ const (
 )
 
 func (i WorkerStatus) Int64() int64 {
-	if i < 0 || i >= WorkerStatus(len(_WorkerStatus_index)-1) {
+	if i < 0 || i >= WorkerStatus(len(_WorkerStatusIndex)-1) {
 		return -1
 	}
 

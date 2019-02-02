@@ -18,7 +18,7 @@ const (
 )
 
 func (i TaskStatus) Int64() int64 {
-	if i < 0 || i >= TaskStatus(len(_TaskStatus_index)-1) {
+	if i < 0 || i >= TaskStatus(len(_TaskStatusIndex)-1) {
 		return -1
 	}
 
