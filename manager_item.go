@@ -5,11 +5,6 @@ import (
 	"sync/atomic"
 )
 
-const (
-	LockFalse = int64(iota)
-	LockTrue
-)
-
 type ManagerItem interface {
 	sync.Locker
 	StatusItem
@@ -23,19 +18,19 @@ type ManagerItem interface {
 type ManagerItemBase struct {
 	StatusItemBase
 
-	lock int64
+	lock uint32
 }
 
 func (i *ManagerItemBase) Lock() {
-	atomic.StoreInt64(&i.lock, LockTrue)
+	atomic.StoreUint32(&i.lock, 1)
 }
 
 func (i *ManagerItemBase) Unlock() {
-	atomic.StoreInt64(&i.lock, LockFalse)
+	atomic.StoreUint32(&i.lock, 0)
 }
 
 func (i *ManagerItemBase) IsLocked() bool {
-	return atomic.LoadInt64(&i.lock) == LockTrue
+	return atomic.LoadUint32(&i.lock) == 1
 }
 
 func (i *ManagerItemBase) Metadata() Metadata {
