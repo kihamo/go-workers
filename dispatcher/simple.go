@@ -230,6 +230,7 @@ func (d *SimpleDispatcher) GetListeners() []workers.Listener {
 
 func (d *SimpleDispatcher) doResultCollector() {
 	d.wg.Add(1)
+	defer d.wg.Done()
 
 	for {
 		select {
@@ -276,7 +277,6 @@ func (d *SimpleDispatcher) doResultCollector() {
 			d.notifyAllowExecuteTasks()
 
 		case <-d.ctx.Done():
-			d.wg.Done()
 			return
 		}
 	}
@@ -284,43 +284,47 @@ func (d *SimpleDispatcher) doResultCollector() {
 
 func (d *SimpleDispatcher) doDispatch() {
 	d.wg.Add(1)
+	defer d.wg.Done()
 
 	for {
 		select {
 		case <-d.allowExecuteTasks:
-			if d.IsStatus(workers.DispatcherStatusCancel) {
-				continue
-			}
-
-			for {
-				pullWorker := d.workers.Pull()
-				pullTask := d.tasks.Pull()
-
-				if pullWorker != nil && pullTask != nil {
-					castWorker := pullWorker.(*manager.WorkersManagerItem)
-					castTask := pullTask.(*manager.TasksManagerItem)
-
-					d.listeners.AsyncTrigger(d.Context(), workers.EventTaskExecuteStart, castTask.Task(), castTask.Metadata(), castWorker.Worker(), castWorker.Metadata())
-					go d.doRunTask(castWorker, castTask)
-				} else {
-					if pullWorker != nil {
-						d.workers.Push(pullWorker)
-					}
-
-					if pullTask != nil {
-						d.tasks.Push(pullTask)
-					}
-
-					break
-				}
-			}
+			d.doExecuteTasks()
 
 		case <-d.tickerAllowExecuteTasks.C():
-			d.notifyAllowExecuteTasks()
+			d.doExecuteTasks()
 
 		case <-d.ctx.Done():
 			d.tickerAllowExecuteTasks.Stop()
-			d.wg.Done()
+			return
+		}
+	}
+}
+
+func (d *SimpleDispatcher) doExecuteTasks() {
+	if !d.IsStatus(workers.DispatcherStatusProcess) {
+		return
+	}
+
+	for {
+		pullWorker := d.workers.Pull()
+		pullTask := d.tasks.Pull()
+
+		if pullWorker != nil && pullTask != nil {
+			castWorker := pullWorker.(*manager.WorkersManagerItem)
+			castTask := pullTask.(*manager.TasksManagerItem)
+
+			d.listeners.AsyncTrigger(d.Context(), workers.EventTaskExecuteStart, castTask.Task(), castTask.Metadata(), castWorker.Worker(), castWorker.Metadata())
+			go d.doRunTask(castWorker, castTask)
+		} else {
+			if pullWorker != nil {
+				d.workers.Push(pullWorker)
+			}
+
+			if pullTask != nil {
+				d.tasks.Push(pullTask)
+			}
+
 			return
 		}
 	}
