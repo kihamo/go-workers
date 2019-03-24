@@ -127,17 +127,15 @@ func (m *TasksManager) GetAll() []workers.ManagerItem {
 // пересчитывает количество не заблокированных задач, так как оно меняется произвольно из-за отложенной даты запуска
 func (m *TasksManager) recalculate() {
 	for {
-		select {
-		case <-m.tickerRecalculate.C():
-			var unlockedCounts uint64
+		<-m.tickerRecalculate.C()
+		var unlockedCounts uint64
 
-			for _, t := range m.queue.All() {
-				if !t.IsLocked() {
-					unlockedCounts++
-				}
+		for _, t := range m.queue.All() {
+			if !t.IsLocked() {
+				unlockedCounts++
 			}
-
-			atomic.StoreUint64(&m.unlockedCounts, unlockedCounts)
 		}
+
+		atomic.StoreUint64(&m.unlockedCounts, unlockedCounts)
 	}
 }

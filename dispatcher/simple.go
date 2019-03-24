@@ -132,8 +132,6 @@ func (d *SimpleDispatcher) RemoveWorker(worker workers.Worker) {
 		d.workers.Remove(item)
 		d.listeners.AsyncTrigger(d.Context(), workers.EventWorkerRemove, workerItem.Worker(), workerItem.Metadata())
 	}
-
-	return
 }
 
 func (d *SimpleDispatcher) GetWorkerMetadata(id string) workers.Metadata {
@@ -178,8 +176,6 @@ func (d *SimpleDispatcher) RemoveTask(task workers.Task) {
 		d.tasks.Remove(item)
 		d.listeners.AsyncTrigger(d.Context(), workers.EventTaskRemove, taskItem.Task(), taskItem.Metadata())
 	}
-
-	return
 }
 
 func (d *SimpleDispatcher) GetTaskMetadata(id string) workers.Metadata {
@@ -318,11 +314,11 @@ func (d *SimpleDispatcher) doExecuteTasks() {
 			go d.doRunTask(castWorker, castTask)
 		} else {
 			if pullWorker != nil {
-				d.workers.Push(pullWorker)
+				_ = d.workers.Push(pullWorker)
 			}
 
 			if pullTask != nil {
-				d.tasks.Push(pullTask)
+				_ = d.tasks.Push(pullTask)
 			}
 
 			return

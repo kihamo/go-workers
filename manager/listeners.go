@@ -165,9 +165,7 @@ func (m *ListenersManager) listenersForEvent(event workers.Event) []*ListenersMa
 	m.mutex.RUnlock()
 
 	if okAll {
-		for _, listener := range listenersAll {
-			listeners = append(listeners, listener)
-		}
+		listeners = append(listeners, listenersAll...)
 	}
 
 	return listeners

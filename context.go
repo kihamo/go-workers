@@ -6,18 +6,18 @@ import (
 )
 
 var (
-	attemptContextKey = &ContextKey{"attempt"}
+	attemptContextKey = &contextKey{"attempt"}
 )
 
-type ContextKey struct {
+type contextKey struct {
 	Name string
 }
 
-func (k *ContextKey) String() string {
+func (k *contextKey) String() string {
 	return "dashboard context value " + k.Name
 }
 
-func (k *ContextKey) GoString() string {
+func (k *contextKey) GoString() string {
 	return fmt.Sprintf("%s %#p", k.String(), k)
 }
 
