@@ -11,11 +11,12 @@ import (
 )
 
 type TasksManagerItem struct {
+	index    int64
+	attempts int64
+
 	workers.ManagerItemBase
 	mutex sync.RWMutex
 
-	index          int64
-	attempts       int64
 	task           workers.Task
 	allowStartAt   unsafe.Pointer
 	firstStartedAt unsafe.Pointer
