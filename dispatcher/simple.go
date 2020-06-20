@@ -247,7 +247,7 @@ func (d *SimpleDispatcher) doResultCollector() {
 				}
 			}
 
-			if !result.cancel || !result.taskItem.IsStatus(workers.TaskStatusCancel) {
+			if !result.cancel && !result.taskItem.IsStatus(workers.TaskStatusCancel) {
 				if result.err != nil {
 					d.setStatusTask(result.taskItem, workers.TaskStatusFail)
 				} else {
