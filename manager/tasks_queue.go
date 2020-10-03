@@ -70,9 +70,8 @@ func (q *tasksQueue) Pop() interface{} {
 
 	defer func() {
 		for n < len(q.list) {
-			q.list[n].setIndex(n)
-
 			n++
+			q.list[n].setIndex(n)
 		}
 
 		q.mutex.Unlock()
