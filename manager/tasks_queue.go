@@ -64,6 +64,9 @@ func (q *tasksQueue) Pop() interface{} {
 	q.mutex.Lock()
 
 	n := len(q.list) - 1
+	if n < 0 {
+		return nil
+	}
 
 	defer func() {
 		for n < len(q.list) {
