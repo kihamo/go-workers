@@ -61,27 +61,43 @@ func (q *tasksQueue) Push(x interface{}) {
 }
 
 func (q *tasksQueue) Pop() interface{} {
-	if q.Len() == 0 {
-		return nil
+	q.mutex.Lock()
+
+	n := len(q.list) - 1
+
+	defer func() {
+		for n < len(q.list) {
+			q.list[n].setIndex(n)
+
+			n++
+		}
+
+		q.mutex.Unlock()
+	}()
+
+	for n != 0 {
+		item := q.list[n]
+
+		q.list = append(q.list[:n], append(q.list[n+1:], item)...)
+
+		if !item.IsLocked() {
+			item.setIndex(-1)
+			return item
+		}
+
+		n--
 	}
 
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
-	old := q.list
-	n := len(old) - 1
-
-	item := old[n]
-	item.setIndex(-1)
-
-	q.list = old[:n]
-
-	return item
+	return nil
 }
 
 func (q *tasksQueue) All() []*TasksManagerItem {
 	q.mutex.RLock()
 	defer q.mutex.RUnlock()
+
+	if len(q.list) == 0 {
+		return nil
+	}
 
 	tmp := make([]*TasksManagerItem, len(q.list))
 	copy(tmp, q.list)

@@ -58,30 +58,17 @@ func (m *TasksManager) Pull() workers.ManagerItem {
 		return nil
 	}
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	var ret workers.ManagerItem
-	forReturn := make([]workers.ManagerItem, 0, m.queue.Len())
-
-	for item := heap.Pop(m.queue); item != nil; item = heap.Pop(m.queue) {
+	item := heap.Pop(m.queue)
+	if item != nil {
 		mItem := item.(workers.ManagerItem)
-		forReturn = append(forReturn, mItem)
+		mItem.Lock()
 
-		if !mItem.IsLocked() {
-			mItem.Lock()
-			atomic.AddUint64(&m.unlockedCounts, ^uint64(0))
-			ret = mItem
+		atomic.AddUint64(&m.unlockedCounts, ^uint64(0))
 
-			break
-		}
+		return mItem
 	}
 
-	for _, item := range forReturn {
-		heap.Push(m.queue, item)
-	}
-
-	return ret
+	return nil
 }
 
 func (m *TasksManager) Remove(item workers.ManagerItem) {
