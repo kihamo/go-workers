@@ -3,10 +3,11 @@ package manager
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/kihamo/go-workers"
 	"github.com/kihamo/go-workers/task"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestPop(t *testing.T) {
@@ -29,8 +30,6 @@ func TestPop(t *testing.T) {
 	if assert.NotNil(t, item) {
 		assert.IsType(t, &TasksManagerItem{}, item)
 		assert.Equal(t, item.(*TasksManagerItem).Task().Name(), "task-0")
-		m.Push(item)
-		item.(*TasksManagerItem).Lock()
 	}
 
 	item = m.Pull()
@@ -47,14 +46,7 @@ func TestPop(t *testing.T) {
 
 	item = m.Pull()
 	assert.Nil(t, item)
-
-	for i, it := range m.GetAll() {
-		cast := it.(*TasksManagerItem)
-
-		assert.Equal(t, cast.Task().Name(), fmt.Sprintf("task-%d", i))
-		assert.Equal(t, i, cast.Index())
-		assert.True(t, cast.IsLocked())
-	}
+	assert.Len(t, m.GetAll(), 0)
 }
 
 func BenchmarkPull(b *testing.B) {

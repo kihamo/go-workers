@@ -140,3 +140,7 @@ func (t *TasksManagerItem) Cancel() {
 		cancel()
 	}
 }
+
+func (t *TasksManagerItem) String() string {
+	return t.Task().Name()
+}

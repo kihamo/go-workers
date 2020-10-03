@@ -75,15 +75,17 @@ func (q *tasksQueue) Pop() interface{} {
 		q.mutex.Unlock()
 	}()
 
-	for n != 0 {
+	for n >= 0 {
 		item := q.list[n]
 
-		q.list = append(q.list[:n], append(q.list[n+1:], item)...)
+		q.list = append(q.list[:n], q.list[n+1:]...)
 
 		if !item.IsLocked() {
 			item.setIndex(-1)
 			return item
 		}
+
+		q.list = append(q.list, item)
 
 		n--
 	}
