@@ -62,6 +62,7 @@ func (q *tasksQueue) Push(x interface{}) {
 
 func (q *tasksQueue) Pop() interface{} {
 	q.mutex.Lock()
+	defer q.mutex.Unlock()
 
 	n := len(q.list) - 1
 	if n < 0 {
@@ -73,8 +74,6 @@ func (q *tasksQueue) Pop() interface{} {
 			n++
 			q.list[n].setIndex(n)
 		}
-
-		q.mutex.Unlock()
 	}()
 
 	for n >= 0 {
